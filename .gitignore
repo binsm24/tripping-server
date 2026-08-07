@@ -1,0 +1,104 @@
+# =========================
+# Gradle
+# =========================
+.gradle/
+build/
+
+# Gradle Wrapper
+!gradle/wrapper/gradle-wrapper.jar
+
+# Ignore generated build directories inside source folders
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+
+# =========================
+# Java
+# =========================
+*.class
+
+
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+
+# =========================
+# Eclipse / STS
+# =========================
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+.apt_generated/
+bin/
+
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+
+# =========================
+# NetBeans
+# =========================
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+
+# =========================
+# Logs
+# =========================
+*.log
+
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+!.env.example
+
+
+# =========================
+# Spring local and secret configuration
+# =========================
+application-local.properties
+application-local.yml
+application-secret.properties
+application-secret.yml
+application-prod.properties
+application-prod.yml
+
+
+# =========================
+# API keys and credentials
+# =========================
+*secret*
+*credentials*
+*credential*
+*service-account*
+*firebase-adminsdk*
+firebase-service-account.json
+service-account-key.json
