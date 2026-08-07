@@ -317,8 +317,8 @@ test: add recommendation controller test
 
 ## 관련 Repository
 
-- Frontend: 프론트엔드 Repository 주소
-- Backend: 현재 Repository 주소
+- Frontend: (https://github.com/enhn16/TripPing-frontend)
+- Backend: (https://github.com/binsm24/tripping-server)
 
 ## License
 
