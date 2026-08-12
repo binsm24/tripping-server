@@ -60,5 +60,17 @@ public class NearbyRecommendationResponse {
                 example = "경기도 수원시 영통구 광교호수로 100"
         )
         private String address;
+
+        @Schema(
+                description = "위도",
+                example = "37.2851"
+        )
+        private Double latitude;
+
+        @Schema(
+                description = "경도",
+                example = "127.0573"
+        )
+        private Double longitude;
     }
 }

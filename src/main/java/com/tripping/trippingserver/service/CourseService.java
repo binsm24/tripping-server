@@ -34,6 +34,8 @@ public class CourseService {
                                 .name("안목해변")
                                 .summary("푸른 바다를 바라보며 산책하기 좋은 해변입니다.")
                                 .imageUrl("https://example.com/anmok.jpg")
+                                .latitude(37.751853)
+                                .longitude(128.896057)
                                 .build(),
 
                         CoursePlaceResponse.builder()
@@ -42,6 +44,8 @@ public class CourseService {
                                 .name("테라로사")
                                 .summary("감성적인 분위기의 스페셜티 카페입니다.")
                                 .imageUrl("https://example.com/terarosa.jpg")
+                                .latitude(37.7225)
+                                .longitude(128.9304)
                                 .build(),
 
                         CoursePlaceResponse.builder()
@@ -50,6 +54,8 @@ public class CourseService {
                                 .name("경포호")
                                 .summary("호수를 따라 산책하기 좋은 관광지입니다.")
                                 .imageUrl("https://example.com/gyeongpo.jpg")
+                                .latitude(37.7982)
+                                .longitude(128.8969)
                                 .build(),
 
                         CoursePlaceResponse.builder()
@@ -58,6 +64,8 @@ public class CourseService {
                                 .name("초당순두부")
                                 .summary("강릉 대표 순두부 맛집입니다.")
                                 .imageUrl("https://example.com/tofu.jpg")
+                                .latitude(37.7868)
+                                .longitude(128.9166)
                                 .build()
                 ))
                 .build();

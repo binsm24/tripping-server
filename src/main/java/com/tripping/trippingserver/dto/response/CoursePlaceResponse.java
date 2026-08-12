@@ -38,4 +38,16 @@ public class CoursePlaceResponse {
             example = "https://..."
     )
     private String imageUrl;
+
+    @Schema(
+            description = "위도",
+            example = "37.751853"
+    )
+    private Double latitude;
+
+    @Schema(
+            description = "경도",
+            example = "128.896057"
+    )
+    private Double longitude;
 }

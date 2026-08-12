@@ -54,5 +54,17 @@ public class RecommendationResponse {
                 example = "도심 속에서 산책과 야경을 함께 즐길 수 있는 장소입니다."
         )
         private String summary;
+
+        @Schema(
+                description = "위도",
+                example = "37.2851"
+        )
+        private Double latitude;
+
+        @Schema(
+                description = "경도",
+                example = "127.0573"
+        )
+        private Double longitude;
     }
 }
