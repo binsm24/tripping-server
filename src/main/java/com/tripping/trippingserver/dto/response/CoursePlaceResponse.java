@@ -19,7 +19,7 @@ public class CoursePlaceResponse {
             description = "장소 ID",
             example = "101"
     )
-    private Long placeId;
+    private String placeId;
 
     @Schema(
             description = "장소명",
