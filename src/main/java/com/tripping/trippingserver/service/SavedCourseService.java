@@ -6,6 +6,9 @@ import com.tripping.trippingserver.dto.response.SavedCourseDetailResponse;
 import com.tripping.trippingserver.dto.response.SavedCourseSummaryResponse;
 import org.springframework.stereotype.Service;
 
+import com.tripping.trippingserver.exception.BusinessException;
+import com.tripping.trippingserver.exception.ErrorCode;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -70,8 +73,8 @@ public class SavedCourseService {
                 )
                 .findFirst()
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "저장된 코스를 찾을 수 없습니다."
+                        new BusinessException(
+                                ErrorCode.SAVED_COURSE_NOT_FOUND
                         )
                 );
     }
