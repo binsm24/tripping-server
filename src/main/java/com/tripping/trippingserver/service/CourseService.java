@@ -14,7 +14,7 @@ public class CourseService {
             CourseCreateRequest request
     ) {
         return CourseResponse.builder()
-                .courseId(1L)
+                .courseId("course-abc123")
                 .courseTitle("강릉 감성 힐링 여행")
                 .estimatedDuration("약 6시간")
                 .tags(List.of(
@@ -30,7 +30,7 @@ public class CourseService {
                 .places(List.of(
                         CoursePlaceResponse.builder()
                                 .order(1)
-                                .placeId("101")
+                                .placeId("tourism-101")
                                 .name("안목해변")
                                 .summary("푸른 바다를 바라보며 산책하기 좋은 해변입니다.")
                                 .imageUrl("https://example.com/anmok.jpg")
@@ -40,7 +40,7 @@ public class CourseService {
 
                         CoursePlaceResponse.builder()
                                 .order(2)
-                                .placeId("401")
+                                .placeId("tourism-401")
                                 .name("테라로사")
                                 .summary("감성적인 분위기의 스페셜티 카페입니다.")
                                 .imageUrl("https://example.com/terarosa.jpg")
@@ -50,7 +50,7 @@ public class CourseService {
 
                         CoursePlaceResponse.builder()
                                 .order(3)
-                                .placeId("201")
+                                .placeId("tourism-201")
                                 .name("경포호")
                                 .summary("호수를 따라 산책하기 좋은 관광지입니다.")
                                 .imageUrl("https://example.com/gyeongpo.jpg")
@@ -60,7 +60,7 @@ public class CourseService {
 
                         CoursePlaceResponse.builder()
                                 .order(4)
-                                .placeId("301")
+                                .placeId("tourism-301")
                                 .name("초당순두부")
                                 .summary("강릉 대표 순두부 맛집입니다.")
                                 .imageUrl("https://example.com/tofu.jpg")

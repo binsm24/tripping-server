@@ -1,32 +1,30 @@
 package com.tripping.trippingserver.service;
 
 import com.tripping.trippingserver.dto.request.SavedCourseCreateRequest;
-import com.tripping.trippingserver.dto.response.CoursePlaceResponse;
 import com.tripping.trippingserver.dto.response.SavedCourseDetailResponse;
 import com.tripping.trippingserver.dto.response.SavedCourseSummaryResponse;
-import org.springframework.stereotype.Service;
-
 import com.tripping.trippingserver.exception.BusinessException;
 import com.tripping.trippingserver.exception.ErrorCode;
+import com.tripping.trippingserver.repository.SavedCourseDocument;
+import com.tripping.trippingserver.repository.SavedCourseRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 @Service
+@RequiredArgsConstructor
 public class SavedCourseService {
 
-    private final List<SavedCourseDetailResponse> savedCourses =
-            new ArrayList<>();
+    private final SavedCourseRepository savedCourseRepository;
 
     public SavedCourseDetailResponse saveCourse(
             SavedCourseCreateRequest request
     ) {
-        long savedCourseId = savedCourses.size() + 1L;
-
-        SavedCourseDetailResponse savedCourse =
-                SavedCourseDetailResponse.builder()
-                        .savedCourseId(savedCourseId)
+        SavedCourseDocument document =
+                SavedCourseDocument.builder()
                         .courseId(request.getCourseId())
                         .courseTitle("강릉 감성 힐링 여행")
                         .estimatedDuration("약 6시간")
@@ -39,79 +37,114 @@ public class SavedCourseService {
                         .description(
                                 "푸른 바다와 감성 카페를 함께 즐길 수 있는 하루 코스입니다."
                         )
-                        .mapImageUrl("https://example.com/course-map.png")
-                        .createdAt(LocalDateTime.now())
-                        .places(createTemporaryPlaces())
+                        .mapImageUrl(
+                                "https://example.com/course-map.png"
+                        )
+                        .createdAt(
+                                LocalDateTime.now().toString()
+                        )
                         .build();
 
-        savedCourses.add(savedCourse);
+        try {
+            SavedCourseDocument saved =
+                    savedCourseRepository.save(document);
 
-        return savedCourse;
+            return toDetailResponse(saved);
+
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+
+        } catch (ExecutionException exception) {
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
-    public List<SavedCourseSummaryResponse> getSavedCourses() {
-        return savedCourses.stream()
-                .map(course ->
-                        SavedCourseSummaryResponse.builder()
-                                .savedCourseId(course.getSavedCourseId())
-                                .courseId(course.getCourseId())
-                                .courseTitle(course.getCourseTitle())
-                                .estimatedDuration(course.getEstimatedDuration())
-                                .mapImageUrl(course.getMapImageUrl())
-                                .createdAt(course.getCreatedAt())
-                                .build()
-                )
-                .toList();
+    public List<SavedCourseSummaryResponse> getSavedCourses(String savedCourseId) {
+        try {
+            return savedCourseRepository.findAll()
+                    .stream()
+                    .map(this::toSummaryResponse)
+                    .toList();
+
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+
+        } catch (ExecutionException exception) {
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     public SavedCourseDetailResponse getSavedCourse(
-            Long savedCourseId
+            String savedCourseId
     ) {
-        return savedCourses.stream()
-                .filter(course ->
-                        course.getSavedCourseId().equals(savedCourseId)
-                )
-                .findFirst()
-                .orElseThrow(() ->
-                        new BusinessException(
-                                ErrorCode.SAVED_COURSE_NOT_FOUND
-                        )
-                );
+        try {
+            SavedCourseDocument saved =
+                    savedCourseRepository
+                            .findById(savedCourseId)
+                            .orElseThrow(() ->
+                                    new BusinessException(
+                                            ErrorCode.SAVED_COURSE_NOT_FOUND
+                                    )
+                            );
+
+            return toDetailResponse(saved);
+
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+
+        } catch (ExecutionException exception) {
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
-    private List<CoursePlaceResponse> createTemporaryPlaces() {
-        return List.of(
-                CoursePlaceResponse.builder()
-                        .order(1)
-                        .placeId("101")
-                        .name("안목해변")
-                        .summary("푸른 바다를 바라보며 산책하기 좋은 해변")
-                        .imageUrl("https://example.com/anmok.jpg")
-                        .build(),
+    private SavedCourseDetailResponse toDetailResponse(
+            SavedCourseDocument document
+    ) {
+        return SavedCourseDetailResponse.builder()
+                .savedCourseId(document.getSavedCourseId())
+                .courseId(document.getCourseId())
+                .courseTitle(document.getCourseTitle())
+                .estimatedDuration(document.getEstimatedDuration())
+                .tags(document.getTags())
+                .description(document.getDescription())
+                .mapImageUrl(document.getMapImageUrl())
+                .createdAt(
+                        LocalDateTime.parse(document.getCreatedAt())
+                )
+                .places(List.of())
+                .build();
+    }
 
-                CoursePlaceResponse.builder()
-                        .order(2)
-                        .placeId("401")
-                        .name("테라로사")
-                        .summary("감성적인 분위기의 스페셜티 카페")
-                        .imageUrl("https://example.com/terarosa.jpg")
-                        .build(),
-
-                CoursePlaceResponse.builder()
-                        .order(3)
-                        .placeId("201")
-                        .name("경포호")
-                        .summary("호수를 따라 산책하기 좋은 관광지")
-                        .imageUrl("https://example.com/gyeongpo.jpg")
-                        .build(),
-
-                CoursePlaceResponse.builder()
-                        .order(4)
-                        .placeId("301L")
-                        .name("초당순두부")
-                        .summary("강릉 대표 순두부 맛집")
-                        .imageUrl("https://example.com/tof u.jpg")
-                        .build()
-        );
+    private SavedCourseSummaryResponse toSummaryResponse(
+            SavedCourseDocument document
+    ) {
+        return SavedCourseSummaryResponse.builder()
+                .savedCourseId(document.getSavedCourseId())
+                .courseId(document.getCourseId())
+                .courseTitle(document.getCourseTitle())
+                .estimatedDuration(document.getEstimatedDuration())
+                .mapImageUrl(document.getMapImageUrl())
+                .createdAt(
+                        LocalDateTime.parse(document.getCreatedAt())
+                )
+                .build();
     }
 }

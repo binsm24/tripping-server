@@ -51,9 +51,11 @@ public class SavedCourseController {
             summary = "보관함 목록 조회",
             description = "사용자가 저장한 여행 코스 목록을 조회합니다."
     )
-    public ResponseEntity<ApiResponse<List<SavedCourseSummaryResponse>>> getSavedCourses() {
+    public ResponseEntity<ApiResponse<List<SavedCourseSummaryResponse>>> getSavedCourses(
+            @RequestParam String userId
+    ) {
         List<SavedCourseSummaryResponse> data =
-                savedCourseService.getSavedCourses();
+                savedCourseService.getSavedCourses(userId);
 
         return ResponseEntity.ok(
                 ApiResponse.success(
@@ -74,7 +76,7 @@ public class SavedCourseController {
                     description = "보관함 항목 ID",
                     example = "15"
             )
-            @PathVariable Long savedCourseId
+            @PathVariable String savedCourseId
     ) {
         SavedCourseDetailResponse data =
                 savedCourseService.getSavedCourse(savedCourseId);
