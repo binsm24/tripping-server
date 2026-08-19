@@ -32,10 +32,11 @@ public class SavedCourseController {
             description = "생성된 여행 코스를 사용자의 보관함에 저장합니다."
     )
     public ResponseEntity<ApiResponse<SavedCourseDetailResponse>> saveCourse(
+            @RequestParam String userId,
             @Valid @RequestBody SavedCourseCreateRequest request
     ) {
         SavedCourseDetailResponse data =
-                savedCourseService.saveCourse(request);
+                savedCourseService.saveCourse(userId, request);
 
         return ResponseEntity.ok(
                 ApiResponse.success(

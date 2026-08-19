@@ -3,6 +3,7 @@ package com.tripping.trippingserver.service;
 import com.tripping.trippingserver.dto.request.SavedCourseCreateRequest;
 import com.tripping.trippingserver.dto.response.SavedCourseDetailResponse;
 import com.tripping.trippingserver.dto.response.SavedCourseSummaryResponse;
+import com.tripping.trippingserver.dto.response.CoursePlaceResponse;
 import com.tripping.trippingserver.exception.BusinessException;
 import com.tripping.trippingserver.exception.ErrorCode;
 import com.tripping.trippingserver.repository.SavedCourseDocument;
@@ -14,40 +15,46 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import com.tripping.trippingserver.repository.CourseDocument;
+import com.tripping.trippingserver.repository.CourseRepository;
+
 @Service
 @RequiredArgsConstructor
 public class SavedCourseService {
 
     private final SavedCourseRepository savedCourseRepository;
+    private final CourseRepository courseRepository;
 
     public SavedCourseDetailResponse saveCourse(
+            String userId,
             SavedCourseCreateRequest request
     ) {
-        SavedCourseDocument document =
-                SavedCourseDocument.builder()
-                        .courseId(request.getCourseId())
-                        .courseTitle("강릉 감성 힐링 여행")
-                        .estimatedDuration("약 6시간")
-                        .tags(List.of(
-                                "#자연",
-                                "#연인",
-                                "#강릉",
-                                "#힐링"
-                        ))
-                        .description(
-                                "푸른 바다와 감성 카페를 함께 즐길 수 있는 하루 코스입니다."
-                        )
-                        .mapImageUrl(
-                                "https://example.com/course-map.png"
-                        )
-                        .createdAt(
-                                LocalDateTime.now().toString()
-                        )
-                        .build();
-
         try {
+            CourseDocument course =
+                    courseRepository.findById(request.getCourseId())
+                            .orElseThrow(() ->
+                                    new BusinessException(
+                                            ErrorCode.COURSE_NOT_FOUND
+                                    )
+                            );
+
+            SavedCourseDocument savedCourse =
+                    SavedCourseDocument.builder()
+                            .userId(userId)
+                            .courseId(course.getCourseId())
+                            .courseTitle(course.getCourseTitle())
+                            .estimatedDuration(course.getEstimatedDuration())
+                            .tags(course.getTags())
+                            .description(course.getDescription())
+                            .mapImageUrl(course.getMapImageUrl())
+                            .createdAt(
+                                    java.time.LocalDateTime.now().toString()
+                            )
+                            .places(course.getPlaces())
+                            .build();
+
             SavedCourseDocument saved =
-                    savedCourseRepository.save(document);
+                    savedCourseRepository.save(savedCourse);
 
             return toDetailResponse(saved);
 
@@ -65,9 +72,11 @@ public class SavedCourseService {
         }
     }
 
-    public List<SavedCourseSummaryResponse> getSavedCourses(String savedCourseId) {
+    public List<SavedCourseSummaryResponse> getSavedCourses(
+            String userId
+    ) {
         try {
-            return savedCourseRepository.findAll()
+            return savedCourseRepository.findAllByUserId(userId)
                     .stream()
                     .map(this::toSummaryResponse)
                     .toList();
@@ -90,7 +99,7 @@ public class SavedCourseService {
             String savedCourseId
     ) {
         try {
-            SavedCourseDocument saved =
+            SavedCourseDocument savedCourse =
                     savedCourseRepository
                             .findById(savedCourseId)
                             .orElseThrow(() ->
@@ -99,7 +108,7 @@ public class SavedCourseService {
                                     )
                             );
 
-            return toDetailResponse(saved);
+            return toDetailResponse(savedCourse);
 
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -118,6 +127,22 @@ public class SavedCourseService {
     private SavedCourseDetailResponse toDetailResponse(
             SavedCourseDocument document
     ) {
+        List<CoursePlaceResponse> places =
+                document.getPlaces()
+                        .stream()
+                        .map(place ->
+                                CoursePlaceResponse.builder()
+                                        .order(place.getOrder())
+                                        .placeId(place.getPlaceId())
+                                        .name(place.getName())
+                                        .summary(place.getSummary())
+                                        .imageUrl(place.getImageUrl())
+                                        // 보관함 상세 응답에서 제외할 경우
+                                        // 좌표 필드가 없는 DTO를 사용하세요.
+                                        .build()
+                        )
+                        .toList();
+
         return SavedCourseDetailResponse.builder()
                 .savedCourseId(document.getSavedCourseId())
                 .courseId(document.getCourseId())
@@ -129,7 +154,7 @@ public class SavedCourseService {
                 .createdAt(
                         LocalDateTime.parse(document.getCreatedAt())
                 )
-                .places(List.of())
+                .places(places)
                 .build();
     }
 

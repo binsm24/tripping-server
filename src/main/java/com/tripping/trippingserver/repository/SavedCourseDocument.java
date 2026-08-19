@@ -10,6 +10,7 @@ import java.util.List;
 public class SavedCourseDocument {
 
     private String savedCourseId;
+    private String userId;
     private String courseId;
     private String courseTitle;
     private String estimatedDuration;
@@ -17,4 +18,5 @@ public class SavedCourseDocument {
     private String description;
     private String mapImageUrl;
     private String createdAt;
+    private List<CourseDocument.CoursePlaceDocument> places;
 }
