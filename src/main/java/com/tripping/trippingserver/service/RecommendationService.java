@@ -1,16 +1,34 @@
 package com.tripping.trippingserver.service;
 
-import com.tripping.trippingserver.dto.request.RecommendationRequest;
-import com.tripping.trippingserver.dto.response.RecommendationResponse;
-import org.springframework.stereotype.Service;
 import com.tripping.trippingserver.dto.request.NearbyRecommendationRequest;
+import com.tripping.trippingserver.dto.request.RecommendationRequest;
 import com.tripping.trippingserver.dto.response.NearbyRecommendationResponse;
+import com.tripping.trippingserver.dto.response.PlaceDetailResponse;
+import com.tripping.trippingserver.dto.response.RecommendationResponse;
+import com.tripping.trippingserver.external.tourism.TourismApiClient;
+import com.tripping.trippingserver.external.tourism.TourismApiResponse;
+import com.tripping.trippingserver.external.tourism.TourismPlaceMapper;
+import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class RecommendationService {
 
+    private final TourismApiClient tourismApiClient;
+    private final TourismPlaceMapper tourismPlaceMapper;
+
+    public RecommendationService(
+            TourismApiClient tourismApiClient,
+            TourismPlaceMapper tourismPlaceMapper
+    ) {
+        this.tourismApiClient = tourismApiClient;
+        this.tourismPlaceMapper = tourismPlaceMapper;
+    }
+
+    // 기존 추천 API
+    // Gemini 단계 담당이므로 지금은 유지
     public RecommendationResponse recommend(
             RecommendationRequest request
     ) {
@@ -47,44 +65,127 @@ public class RecommendationService {
                 ))
                 .build();
     }
+
+    // 주변 추천 API
     public NearbyRecommendationResponse recommendNearby(
             NearbyRecommendationRequest request
     ) {
+
+        // 1. 요청에서 메인 장소 ID 꺼내기
+        String mainPlaceId = request.getMainPlaceId();
+
+        // tourism-133854 -> 133854
+        String contentId = mainPlaceId.replace("tourism-", "");
+
+        // 2. 메인 장소 상세 조회
+        TourismApiResponse detailResponse =
+                tourismApiClient.getPlaceDetail(contentId);
+
+        // 3. 관광공사 응답 -> 우리 DTO
+        PlaceDetailResponse mainPlace =
+                tourismPlaceMapper.toPlaceDetailResponse(
+                        contentId,
+                        detailResponse
+                );
+
+        // 상세 정보나 좌표가 없으면 주변 조회 불가
+        if (mainPlace == null
+                || mainPlace.getLatitude() == null
+                || mainPlace.getLongitude() == null) {
+
+            throw new IllegalArgumentException(
+                    "메인 관광지를 찾을 수 없습니다."
+            );
+        }
+
+        // 4. 메인 장소 기준 반경 3km 주변 조회
+        TourismApiResponse nearbyResponse =
+                tourismApiClient.getNearbyPlaces(
+                        mainPlace.getLongitude(),
+                        mainPlace.getLatitude(),
+                        3000
+                );
+
+        // 5. 결과 담을 리스트
+        List<NearbyRecommendationResponse.NearbyPlace> attractions =
+                new ArrayList<>();
+
+        List<NearbyRecommendationResponse.NearbyPlace> cafes =
+                new ArrayList<>();
+
+        List<NearbyRecommendationResponse.NearbyPlace> restaurants =
+                new ArrayList<>();
+
+        // 6. 주변 결과가 없으면 빈 리스트 반환
+        if (nearbyResponse == null
+                || nearbyResponse.getResponse() == null
+                || nearbyResponse.getResponse().getBody() == null
+                || nearbyResponse.getResponse().getBody().getItems() == null
+                || nearbyResponse.getResponse()
+                .getBody()
+                .getItems()
+                .getItem() == null) {
+
+            return NearbyRecommendationResponse.builder()
+                    .mainPlaceId(mainPlaceId)
+                    .attractions(attractions)
+                    .cafes(cafes)
+                    .restaurants(restaurants)
+                    .build();
+        }
+
+        // 7. 주변 장소 분류
+        for (TourismApiResponse.Item item :
+                nearbyResponse.getResponse()
+                        .getBody()
+                        .getItems()
+                        .getItem()) {
+
+            // 자기 자신 제외
+            if (contentId.equals(item.getContentid())) {
+                continue;
+            }
+
+            // 좌표 없는 장소 제외
+            if (item.getMapx() == null
+                    || item.getMapx().isBlank()
+                    || item.getMapy() == null
+                    || item.getMapy().isBlank()) {
+                continue;
+            }
+
+            NearbyRecommendationResponse.NearbyPlace place =
+                    tourismPlaceMapper.toNearbyPlace(item);
+
+            String contentTypeId = item.getContenttypeid();
+
+            // 39 = 음식점
+            if ("39".equals(contentTypeId)) {
+
+                if (restaurants.size() < 10) {
+                    restaurants.add(place);
+                }
+
+            } else {
+
+                if (attractions.size() < 10) {
+                    attractions.add(place);
+                }
+            }
+
+            // 둘 다 10개 찼으면 종료
+            if (attractions.size() >= 10
+                    && restaurants.size() >= 10) {
+                break;
+            }
+        }
+
+        // 8. 최종 응답
         return NearbyRecommendationResponse.builder()
-                .mainPlaceId(request.getMainPlaceId())
-                .attractions(List.of(
-                        NearbyRecommendationResponse.NearbyPlace.builder()
-                                .placeId("nearby-attraction-001")
-                                .name("광교 앨리웨이")
-                                .imageUrl("https://example.com/alleyway.jpg")
-                                .summary("호수공원과 함께 방문하기 좋은 복합 문화 공간입니다.")
-                                .address("경기도 수원시 영통구 광교호수로 100")
-                                .latitude(37.2897)
-                                .longitude(127.0558)
-                                .build()
-                ))
-                .cafes(List.of(
-                        NearbyRecommendationResponse.NearbyPlace.builder()
-                                .placeId("nearby-cafe-001")
-                                .name("광교 카페거리")
-                                .imageUrl("https://example.com/cafe.jpg")
-                                .summary("산책 후 여유롭게 쉬어가기 좋은 카페입니다.")
-                                .address("경기도 수원시 영통구 광교중앙로 150")
-                                .latitude(37.2931)
-                                .longitude(127.0567)
-                                .build()
-                ))
-                .restaurants(List.of(
-                        NearbyRecommendationResponse.NearbyPlace.builder()
-                                .placeId("nearby-restaurant-001")
-                                .name("광교 호수 근처 맛집")
-                                .imageUrl("https://example.com/restaurant.jpg")
-                                .summary("여행 중 식사하기 좋은 주변 음식점입니다.")
-                                .address("경기도 수원시 영통구 센트럴타운로 20")
-                                .latitude(37.2908)
-                                .longitude(127.0519)
-                                .build()
-                ))
+                .mainPlaceId(mainPlaceId)
+                .attractions(attractions)
+                .cafes(cafes)
+                .restaurants(restaurants)
                 .build();
     }
 }

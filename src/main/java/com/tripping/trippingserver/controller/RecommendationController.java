@@ -13,9 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.tripping.trippingserver.dto.request.NearbyRecommendationRequest;
 import com.tripping.trippingserver.dto.response.NearbyRecommendationResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/recommendations")
