@@ -42,6 +42,10 @@ public class RecommendationController {
             @ApiResponse(
                     responseCode = "400",
                     description = "잘못된 요청"
+            ),
+            @ApiResponse(
+                    responseCode = "502",
+                    description = "관광공사 API 요청 실패"
             )
     })
     public ResponseEntity<RecommendationResponse> recommend(

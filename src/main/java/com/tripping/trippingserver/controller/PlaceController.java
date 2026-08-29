@@ -35,6 +35,10 @@ public class PlaceController {
             @ApiResponse(
                     responseCode = "404",
                     description = "관광지를 찾을 수 없음"
+            ),
+            @ApiResponse(
+                    responseCode = "502",
+                    description = "관광공사 API 요청 실패"
             )
     })
     public ResponseEntity<PlaceDetailResponse> getPlaceDetail(
