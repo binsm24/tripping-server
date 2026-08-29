@@ -44,7 +44,7 @@ public class PlaceController {
     public ResponseEntity<PlaceDetailResponse> getPlaceDetail(
             @Parameter(
                     description = "조회할 관광지 ID",
-                    example = "place-001"
+                    example = "tourism-133854"
             )
             @PathVariable String placeId
     ) {
