@@ -10,6 +10,9 @@ import com.tripping.trippingserver.external.tourism.TourismApiResponse;
 import com.tripping.trippingserver.external.tourism.TourismPlaceMapper;
 import org.springframework.stereotype.Service;
 
+import com.tripping.trippingserver.exception.BusinessException;
+import com.tripping.trippingserver.exception.ErrorCode;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -93,8 +96,8 @@ public class RecommendationService {
                 || mainPlace.getLatitude() == null
                 || mainPlace.getLongitude() == null) {
 
-            throw new IllegalArgumentException(
-                    "메인 관광지를 찾을 수 없습니다."
+            throw new BusinessException(
+                    ErrorCode.PLACE_NOT_FOUND
             );
         }
 

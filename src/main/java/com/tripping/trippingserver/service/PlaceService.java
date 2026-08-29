@@ -6,6 +6,9 @@ import com.tripping.trippingserver.external.tourism.TourismApiResponse;
 import com.tripping.trippingserver.external.tourism.TourismPlaceMapper;
 import org.springframework.stereotype.Service;
 
+import com.tripping.trippingserver.exception.BusinessException;
+import com.tripping.trippingserver.exception.ErrorCode;
+
 @Service
 public class PlaceService {
 
@@ -27,9 +30,18 @@ public class PlaceService {
         TourismApiResponse apiResponse =
                 tourismApiClient.getPlaceDetail(contentId);
 
-        return tourismPlaceMapper.toPlaceDetailResponse(
-                contentId,
-                apiResponse
-        );
+        PlaceDetailResponse response =
+                tourismPlaceMapper.toPlaceDetailResponse(
+                        contentId,
+                        apiResponse
+                );
+
+        if (response == null) {
+            throw new BusinessException(
+                    ErrorCode.PLACE_NOT_FOUND
+            );
+        }
+
+        return response;
     }
 }
