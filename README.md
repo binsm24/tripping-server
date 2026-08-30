@@ -86,6 +86,8 @@ src/main/java/com/tripping/trippingserver
 │   └── response
 ├── entity
 ├── exception
+├── external (추가)
+│   └── tourism
 ├── repository
 └── service
 ```
@@ -100,6 +102,7 @@ src/main/java/com/tripping/trippingserver
 | `repository` | 데이터 저장소 접근 |
 | `config` | Swagger 및 외부 서비스 설정 |
 | `exception` | 예외 및 공통 오류 처리 |
+| `external.tourism` | 한국관광공사 OpenAPI 호출 및 응답 변환 |
 
 ## API 목록
 
@@ -146,6 +149,141 @@ TripPing API는 다음과 같은 공통 응답 구조를 사용합니다.
 | `message` | 처리 결과 메시지 |
 | `data` | 실제 응답 데이터 |
 
+## 한국관광공사 OpenAPI 연동
+
+TripPing은 한국관광공사 국문 관광정보 OpenAPI를 연동하여
+관광지 상세 정보와 위치 기반 주변 장소 정보를 실데이터로 조회합니다.
+
+### 사용 API
+
+- `detailCommon2`
+  - 관광지 상세 정보 조회
+- `locationBasedList2`
+  - 위도·경도를 기준으로 주변 장소 조회
+
+관광공사 API Key는 코드에 직접 작성하지 않고 환경변수로 관리합니다.
+
+```properties
+tourism.api-key=${TOURISM_API_KEY:}
+tourism.base-url=${TOURISM_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
+```
+
+관광공사의 `contentId`는 TripPing 내부에서 다음과 같은 형식의 `placeId`로 사용합니다.
+
+```text
+tourism-133854
+```
+
+예시:
+
+```text
+관광공사 contentId : 133854
+TripPing placeId   : tourism-133854
+```
+
+### 관광지 상세 조회
+
+```http
+GET /api/places/{placeId}
+```
+
+요청 예시:
+
+```http
+GET /api/places/tourism-133854
+```
+
+한국관광공사의 관광지 상세 정보를 조회한 뒤
+TripPing에서 사용하는 응답 DTO 형태로 변환하여 반환합니다.
+
+주요 응답 정보:
+
+- 관광지 ID
+- 관광지명
+- 설명
+- 이미지 URL
+- 주소
+- 전화번호
+- 위도
+- 경도
+- 지도 URL
+
+존재하지 않는 관광지를 조회할 경우
+`404 PLACE_NOT_FOUND`를 반환합니다.
+
+관광공사 API 호출 중 오류가 발생할 경우
+`502 EXTERNAL_API_ERROR`를 반환합니다.
+
+### 주변 장소 확장 추천
+
+```http
+POST /api/recommendations/nearby
+Content-Type: application/json
+```
+
+요청 예시:
+
+```json
+{
+  "mainPlaceId": "tourism-133854",
+  "recommendationSessionId": "test-session-001"
+}
+```
+
+선택한 메인 관광지의 위도·경도를 기준으로
+반경 3km 이내의 주변 장소를 한국관광공사 API에서 조회합니다.
+
+현재 주변 장소는 관광공사의 `contentTypeId`를 기준으로 분류합니다.
+
+- `39` : 음식점
+- 그 외 : 주변 관광지
+- 카페 : 추후 Kakao Local API 연동 단계에서 보완 예정
+
+관광지와 음식점은 각각 최대 10개까지 반환합니다.
+
+### 관광공사 연동 구조
+
+```text
+Controller
+    ↓
+Service
+    ↓
+TourismApiClient
+    ↓
+한국관광공사 OpenAPI
+    ↓
+TourismApiResponse
+    ↓
+TourismPlaceMapper
+    ↓
+TripPing Response DTO
+```
+
+관광공사 관련 코드는 다음 패키지에서 관리합니다.
+
+```text
+external/tourism
+├── TourismApiClient
+├── TourismApiProperties
+├── TourismApiResponse
+└── TourismPlaceMapper
+```
+
+### 4·5단계 구현 내용
+
+- 한국관광공사 관광정보 OpenAPI 연동
+- 관광지 상세 조회 실데이터 적용
+- 위치 기반 주변 장소 조회 구현
+- 관광공사 응답 DTO 및 Mapper 구현
+- 관광지 위도·경도 실데이터 적용
+- 주변 관광지 및 음식점 분류
+- 관광지·음식점 각각 최대 10개 반환
+- 존재하지 않는 관광지 `404 PLACE_NOT_FOUND` 처리
+- 외부 API 오류 `502 EXTERNAL_API_ERROR` 처리
+- Swagger API 문서 및 응답 코드 정리
+
+> `POST /api/recommendations`의 AI 메인 관광지 추천 기능은 Gemini API 연동 단계에서 실제 데이터로 전환할 예정이며, 현재는 기존 임시 응답을 유지합니다.
+
 ## 주요 요청 예시
 
 ### 메인 관광지 추천
@@ -173,6 +311,29 @@ Content-Type: application/json
   "age": 20,
   "companion": "친구",
   "region": "경기도 수원"
+}
+```
+
+### 관광지 상세 조회
+
+```http
+GET /api/places/tourism-133854
+```
+
+정상적인 관광지 ID를 요청하면
+한국관광공사 OpenAPI에서 조회한 관광지 상세 정보를 반환합니다.
+
+### 주변 장소 확장 추천
+
+```http
+POST /api/recommendations/nearby
+Content-Type: application/json
+```
+
+```json
+{
+  "mainPlaceId": "tourism-133854",
+  "recommendationSessionId": "test-session-001"
 }
 ```
 
@@ -267,32 +428,39 @@ firebase-service-account.json
 
 ### 완료
 
-- Spring Boot 4.0.7 프로젝트 생성
+- Spring Boot 4.0.7 프로젝트 구성
 - Java 21 환경 구성
 - Swagger / OpenAPI 연동
-- 관광지 추천 API 구조 구현
-- 관광지 상세 조회 API 구조 구현
-- 주변 장소 확장 추천 API 구조 구현
-- AI 여행 코스 생성 API 구조 구현
-- 코스 저장 및 보관함 API 구조 구현
-- 공통 응답 형식 적용
-- 예상 소요 시간 응답 구조 추가
-- 코스 생성 및 저장 날짜 응답 구조 추가
+- 공통 응답 및 예외 처리 구조 구현
+- Firebase Admin 초기화
+- Firestore 코스 저장 및 보관함 조회 연동
+- 한국관광공사 관광정보 OpenAPI 연동
+- 관광공사 상세조회 API 연동
+- 관광공사 위치 기반 주변 장소 조회 API 연동
+- 관광공사 응답 DTO 및 Mapper 구현
+- `GET /api/places/{placeId}` 실데이터 적용
+- `POST /api/recommendations/nearby` 실데이터 적용
+- 관광지 위도·경도 실데이터 적용
+- 주변 장소 관광지/음식점 분류
+- 주변 장소 종류별 최대 10개 반환
+- 존재하지 않는 관광지 조회 시 `404 PLACE_NOT_FOUND` 처리
+- 관광공사 API 오류 시 `502 EXTERNAL_API_ERROR` 처리
+- 관광공사 API Key 환경변수 관리
 
 ### 진행 예정
 
-- Firebase 연동
-- 한국관광공사 OpenAPI 연동
-- Gemini API 연동
-- Kakao 지도 및 장소 API 연동
+- Gemini API 실제 연동
+- AI 메인 관광지 추천 실데이터 적용
+- Kakao Local API 연동
+- 카페 데이터 보완
+- Kakao 지도 및 Static Map API 연동
 - Kakao 로그인 실제 연동
-- 공통 예외 처리
 - 인증 토큰 적용
 - 프론트엔드 연결
 - 테스트 코드 작성
 - 배포 환경 구성
 
-> 현재 일부 Service는 API 구조 검증을 위한 임시 데이터를 반환합니다.
+> `POST /api/recommendations`는 Gemini 연동 단계 전까지 API 구조 검증을 위한 임시 데이터를 반환합니다.
 
 ## 브랜치 전략
 
