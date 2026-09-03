@@ -38,7 +38,6 @@ public class RecommendationRequest {
     )
     private String companion;
 
-    @NotBlank
     @Schema(
             description = "여행 지역",
             example = "경기도 수원"

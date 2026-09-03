@@ -1,7 +1,7 @@
 package com.tripping.trippingserver.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -10,10 +10,10 @@ import lombok.NoArgsConstructor;
 @Schema(description = "여행 코스 저장 요청")
 public class SavedCourseCreateRequest {
 
-    @NotNull
+    @NotBlank
     @Schema(
             description = "저장할 여행 코스 ID",
-            example = "1"
+            example = "course-abc123"
     )
-    private Long courseId;
+    private String courseId;
 }

@@ -102,3 +102,4 @@ application-prod.yml
 *firebase-adminsdk*
 firebase-service-account.json
 service-account-key.json
+*-firebase-adminsdk-*.json

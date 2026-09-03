@@ -16,14 +16,14 @@ public class CourseCreateRequest {
     @NotBlank
     @Schema(
             description = "메인 관광지 ID",
-            example = "place-001"
+            example = "tourism-101"
     )
     private String mainPlaceId;
 
     @NotEmpty
     @Schema(
-            description = "사용자가 선택한 장소 ID 목록",
-            example = "[\"place-001\", \"nearby-cafe-001\", \"nearby-restaurant-001\"]"
+            description = "선택한 장소 ID 목록",
+            example = "[\"tourism-101\", \"kakao-401\", \"kakao-301\"]"
     )
     private List<@NotBlank String> selectedPlaceIds;
 }

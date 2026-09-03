@@ -13,15 +13,15 @@ public class SavedCourseSummaryResponse {
 
     @Schema(
             description = "보관함 항목 ID",
-            example = "15"
+            example = "saved-course-001"
     )
-    private Long savedCourseId;
+    private String savedCourseId;
 
     @Schema(
             description = "원본 여행 코스 ID",
-            example = "1"
+            example = "course-abc123"
     )
-    private Long courseId;
+    private String courseId;
 
     @Schema(
             description = "여행 코스명",
