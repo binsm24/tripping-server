@@ -13,9 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.tripping.trippingserver.dto.request.NearbyRecommendationRequest;
 import com.tripping.trippingserver.dto.response.NearbyRecommendationResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/recommendations")
@@ -45,7 +42,7 @@ public class RecommendationController {
             @ApiResponse(
                     responseCode = "400",
                     description = "잘못된 요청"
-            )
+            ),
     })
     public ResponseEntity<RecommendationResponse> recommend(
             @Valid @RequestBody RecommendationRequest request
@@ -73,6 +70,14 @@ public class RecommendationController {
             @ApiResponse(
                     responseCode = "400",
                     description = "잘못된 요청"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "메인 관광지를 찾을 수 없음"
+            ),
+            @ApiResponse(
+                    responseCode = "502",
+                    description = "관광공사 API 요청 실패"
             )
     })
     public ResponseEntity<NearbyRecommendationResponse> recommendNearby(
