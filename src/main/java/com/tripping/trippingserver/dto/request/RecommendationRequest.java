@@ -34,12 +34,12 @@ public class RecommendationRequest {
     @Schema(
             description = "동행자 유형",
             example = "친구",
-            allowableValues = {"연인", "아이", "가족", "친구"}
+            allowableValues = {"혼자","친구","반려동물","부모님","아이","연인"}
     )
     private String companion;
 
     @Schema(
-            description = "여행 지역",
+            description = "여행 지역. 선택 입력값입니다.",
             example = "경기도 수원"
     )
     private String region;
