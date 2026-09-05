@@ -26,10 +26,12 @@ public class AuthController {
     @Operation(
             summary = "카카오 로그인",
             description = """
-                    카카오 Access Token을 이용하여 로그인합니다.
-                    최초 로그인 시 회원가입을 함께 처리합니다.
-                    현재는 Swagger 테스트용 임시 응답을 반환합니다.
-                    """
+                카카오 인가 코드를 이용하여 로그인합니다.
+                백엔드가 카카오 Access Token으로 교환한 뒤
+                카카오 사용자 정보를 조회합니다.
+                로그인 성공 시 TripPing JWT를 발급합니다.
+                최초 로그인 사용자는 Firestore에 저장합니다.
+                """
     )
     public ResponseEntity<ApiResponse<KakaoLoginResponse>> kakaoLogin(
             @Valid @RequestBody KakaoLoginRequest request

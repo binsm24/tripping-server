@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,12 +30,14 @@ public class SavedCourseController {
     @PostMapping
     @Operation(
             summary = "여행 코스 저장",
-            description = "생성된 여행 코스를 사용자의 보관함에 저장합니다."
+            description = "현재 로그인한 사용자의 보관함에 여행 코스를 저장합니다."
     )
     public ResponseEntity<ApiResponse<SavedCourseDetailResponse>> saveCourse(
-            @RequestParam String userId,
+            Authentication authentication,
             @Valid @RequestBody SavedCourseCreateRequest request
     ) {
+        String userId = authentication.getName();
+
         SavedCourseDetailResponse data =
                 savedCourseService.saveCourse(userId, request);
 
@@ -50,11 +53,13 @@ public class SavedCourseController {
     @GetMapping
     @Operation(
             summary = "보관함 목록 조회",
-            description = "사용자가 저장한 여행 코스 목록을 조회합니다."
+            description = "현재 로그인한 사용자의 저장 코스 목록을 조회합니다."
     )
     public ResponseEntity<ApiResponse<List<SavedCourseSummaryResponse>>> getSavedCourses(
-            @RequestParam String userId
+            Authentication authentication
     ) {
+        String userId = authentication.getName();
+
         List<SavedCourseSummaryResponse> data =
                 savedCourseService.getSavedCourses(userId);
 
@@ -70,17 +75,23 @@ public class SavedCourseController {
     @GetMapping("/{savedCourseId}")
     @Operation(
             summary = "보관함 상세 조회",
-            description = "저장된 여행 코스의 상세 정보를 조회합니다."
+            description = "현재 로그인한 사용자의 저장 코스 상세 정보를 조회합니다."
     )
     public ResponseEntity<ApiResponse<SavedCourseDetailResponse>> getSavedCourse(
+            Authentication authentication,
             @Parameter(
                     description = "보관함 항목 ID",
-                    example = "15"
+                    example = "saved-course-123"
             )
             @PathVariable String savedCourseId
     ) {
+        String userId = authentication.getName();
+
         SavedCourseDetailResponse data =
-                savedCourseService.getSavedCourse(savedCourseId);
+                savedCourseService.getSavedCourse(
+                        userId,
+                        savedCourseId
+                );
 
         return ResponseEntity.ok(
                 ApiResponse.success(

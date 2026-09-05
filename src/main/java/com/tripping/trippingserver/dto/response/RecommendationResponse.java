@@ -12,6 +12,12 @@ import java.util.List;
 public class RecommendationResponse {
 
     @Schema(
+            description = "선택된 경기도 지역",
+            example = "양평"
+    )
+    private String selectedRegion;
+
+    @Schema(
             description = "추천 결과 제목",
             example = "수원 자연 힐링 여행"
     )

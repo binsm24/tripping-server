@@ -7,13 +7,13 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
-@Schema(description = "카카오 로그인 요청")
+@Schema(description = "카카오 인가 코드 로그인 요청")
 public class KakaoLoginRequest {
 
     @NotBlank
     @Schema(
-            description = "카카오에서 발급받은 Access Token",
-            example = "test-kakao-access-token"
+            description = "카카오 OAuth 로그인 후 발급받은 인가 코드",
+            example = "authorization-code"
     )
-    private String accessToken;
+    private String code;
 }

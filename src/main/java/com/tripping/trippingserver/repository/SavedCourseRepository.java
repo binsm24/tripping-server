@@ -57,6 +57,7 @@ public class SavedCourseRepository {
 
         return SavedCourseDocument.builder()
                 .savedCourseId(savedCourseId)
+                .userId(document.getUserId())
                 .courseId(document.getCourseId())
                 .courseTitle(document.getCourseTitle())
                 .estimatedDuration(document.getEstimatedDuration())
@@ -64,6 +65,7 @@ public class SavedCourseRepository {
                 .description(document.getDescription())
                 .mapImageUrl(document.getMapImageUrl())
                 .createdAt(document.getCreatedAt())
+                .places(document.getPlaces())
                 .build();
     }
 
