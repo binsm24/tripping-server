@@ -40,6 +40,8 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/",
+                                "/health",
                                 "/api/auth/**",
                                 "/api/recommendations/**",
                                 "/api/places/**",
@@ -47,7 +49,13 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
                                 "/error"
-                        ).permitAll()
+                        )
+                        .permitAll()
+                        .requestMatchers(
+                                "/api/courses/**",
+                                "/api/saved-courses/**"
+                        )
+                        .authenticated()
                         .anyRequest()
                         .authenticated()
                 )
@@ -66,7 +74,8 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "http://localhost:5173"
+                "http://localhost:5173",
+                "http://localhost:5587"
         ));
 
         configuration.setAllowedMethods(List.of(
