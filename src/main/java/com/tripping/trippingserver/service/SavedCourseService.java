@@ -96,6 +96,7 @@ public class SavedCourseService {
     }
 
     public SavedCourseDetailResponse getSavedCourse(
+            String userId,
             String savedCourseId
     ) {
         try {
@@ -108,7 +109,17 @@ public class SavedCourseService {
                                     )
                             );
 
+            if (!userId.equals(savedCourse.getUserId())) {
+                throw new BusinessException(
+                        ErrorCode.FORBIDDEN,
+                        "해당 저장 코스에 접근할 권한이 없습니다."
+                );
+            }
+
             return toDetailResponse(savedCourse);
+
+        } catch (BusinessException exception) {
+            throw exception;
 
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();

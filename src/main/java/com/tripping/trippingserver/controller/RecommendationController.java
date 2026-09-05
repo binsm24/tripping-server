@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.tripping.trippingserver.dto.request.NearbyRecommendationRequest;
 import com.tripping.trippingserver.dto.response.NearbyRecommendationResponse;
+import com.tripping.trippingserver.dto.request.CourseGenerationRequest;
+import com.tripping.trippingserver.dto.response.CourseResponse;
 
 @RestController
 @RequestMapping("/api/recommendations")
@@ -85,6 +87,43 @@ public class RecommendationController {
     ) {
         NearbyRecommendationResponse response =
                 recommendationService.recommendNearby(request);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/course")
+    @Operation(
+            summary = "AI 여행 코스 생성",
+            description = """
+                선택한 메인 관광지와 주변 관광지·카페·음식점,
+                사용자의 여행 조건을 기반으로 AI 하루 여행 코스를 생성합니다.
+                """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "여행 코스 생성 성공"
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "잘못된 요청"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "주변 장소를 찾을 수 없음"
+            ),
+            @ApiResponse(
+                    responseCode = "502",
+                    description = "외부 API 요청 실패"
+            )
+    })
+    public ResponseEntity<CourseResponse> generateCourse(
+            @Valid @RequestBody CourseGenerationRequest request
+    ) {
+        CourseResponse response =
+                recommendationService.generateCourse(
+                        request
+                );
 
         return ResponseEntity.ok(response);
     }

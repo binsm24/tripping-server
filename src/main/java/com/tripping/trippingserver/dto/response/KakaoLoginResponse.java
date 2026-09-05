@@ -11,19 +11,19 @@ public class KakaoLoginResponse {
 
     @Schema(
             description = "TripPing 사용자 ID",
-            example = "1"
+            example = "123456789"
     )
-    private Long userId;
+    private String userId;
 
     @Schema(
             description = "사용자 닉네임",
-            example = "TripPing 사용자"
+            example = "여행자"
     )
     private String nickname;
 
     @Schema(
             description = "TripPing에서 사용할 인증 토큰",
-            example = "test-jwt-token"
+            example = "eyJhbGciOiJIUzI1NiJ9"
     )
     private String accessToken;
 

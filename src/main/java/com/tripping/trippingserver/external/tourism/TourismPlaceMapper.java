@@ -43,6 +43,7 @@ public class TourismPlaceMapper {
                 .latitude(toDouble(item.getMapy()))
                 .longitude(toDouble(item.getMapx()))
                 .kakaoMapUrl("https://map.kakao.com/")
+                .address(item.getAddr1())
                 .build();
     }
 
