@@ -34,6 +34,8 @@ public class GeminiApiClient {
     }
 
     public String generateContent(String prompt) {
+        System.out.println("Gemini model: " + properties.getModel());
+        System.out.println("Gemini base URL: " + properties.getBaseUrl());
         try {
             URI uri = UriComponentsBuilder
                     .fromUriString(properties.getBaseUrl())
@@ -70,17 +72,16 @@ public class GeminiApiClient {
             return extractText(rawResponse);
 
         } catch (RestClientResponseException exception) {
-            System.out.println(
-                    "Gemini HTTP status: "
-                            + exception.getStatusCode()
-            );
+            System.out.println("Gemini HTTP status: " + exception.getStatusCode());
+            System.out.println("Gemini response body: "
+                    + exception.getResponseBodyAsString());
 
             throw new BusinessException(
                     ErrorCode.EXTERNAL_API_ERROR,
                     "Gemini API 요청 중 오류가 발생했습니다."
             );
 
-        } catch (BusinessException exception) {
+    } catch (BusinessException exception) {
             throw exception;
 
         } catch (Exception exception) {

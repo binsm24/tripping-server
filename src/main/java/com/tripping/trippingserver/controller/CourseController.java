@@ -1,6 +1,6 @@
 package com.tripping.trippingserver.controller;
 
-import com.tripping.trippingserver.dto.request.CourseCreateRequest;
+import com.tripping.trippingserver.dto.request.CourseGenerationRequest;
 import com.tripping.trippingserver.dto.response.ApiResponse;
 import com.tripping.trippingserver.dto.response.CourseResponse;
 import com.tripping.trippingserver.service.CourseService;
@@ -26,14 +26,12 @@ public class CourseController {
     @Operation(
             summary = "AI 여행 코스 생성",
             description = """
-                    사용자가 선택한 장소들을 기반으로
-                    여행 코스명, 예상 소요 시간, 태그, 소개,
-                    방문 순서와 지도 이미지 URL을 생성합니다.
-                    현재는 테스트용 임시 데이터를 반환합니다.
+                    사용자가 선택한 메인 관광지와 주변 장소를 기반으로
+                    Gemini를 이용해 실제 여행 코스를 생성합니다.
                     """
     )
     public ResponseEntity<ApiResponse<CourseResponse>> createCourse(
-            @Valid @RequestBody CourseCreateRequest request
+            @Valid @RequestBody CourseGenerationRequest request
     ) {
         CourseResponse data =
                 courseService.createCourse(request);

@@ -37,13 +37,12 @@ public class TourismPlaceMapper {
                 .placeId("tourism-" + contentId)
                 .name(item.getTitle())
                 .description(item.getOverview())
-                .imageUrl(item.getFirstimage())
+                .imageUrl(resolveImageUrl(item))
                 .address(makeAddress(item))
                 .phoneNumber(item.getTel())
                 .latitude(toDouble(item.getMapy()))
                 .longitude(toDouble(item.getMapx()))
                 .kakaoMapUrl("https://map.kakao.com/")
-                .address(item.getAddr1())
                 .build();
     }
 
@@ -53,12 +52,58 @@ public class TourismPlaceMapper {
         return NearbyRecommendationResponse.NearbyPlace.builder()
                 .placeId("tourism-" + item.getContentid())
                 .name(item.getTitle())
-                .imageUrl(item.getFirstimage())
-                .summary("주변 추천 장소입니다.")
+                .imageUrl(resolveImageUrl(item))
+                .summary(resolveSummary(item))
                 .address(makeAddress(item))
                 .latitude(toDouble(item.getMapy()))
                 .longitude(toDouble(item.getMapx()))
                 .build();
+    }
+
+    private String resolveImageUrl(
+            TourismApiResponse.Item item
+    ) {
+        String firstImage = item.getFirstimage();
+
+        if (isValidImageUrl(firstImage)) {
+            return firstImage;
+        }
+
+        String firstImage2 = item.getFirstimage2();
+
+        if (isValidImageUrl(firstImage2)) {
+            return firstImage2;
+        }
+
+        return null;
+    }
+
+    private boolean isValidImageUrl(
+            String imageUrl
+    ) {
+        return imageUrl != null
+                && !imageUrl.isBlank()
+                && (
+                imageUrl.startsWith("https://")
+                        || imageUrl.startsWith("http://")
+        );
+    }
+
+    private String resolveSummary(
+            TourismApiResponse.Item item
+    ) {
+        if (item.getOverview() != null
+                && !item.getOverview().isBlank()) {
+            return item.getOverview().trim();
+        }
+
+        String title = item.getTitle();
+
+        if (title == null || title.isBlank()) {
+            return "주변 추천 장소입니다.";
+        }
+
+        return title + " 주변 추천 장소입니다.";
     }
 
     private String makeAddress(TourismApiResponse.Item item) {

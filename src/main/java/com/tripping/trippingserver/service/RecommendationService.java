@@ -39,6 +39,7 @@ public class RecommendationService {
     private final GeminiApiClient geminiApiClient;
     private final PredefinedPlaceCandidateService candidateService;
     private final ObjectMapper objectMapper;
+    private static final int NEARBY_RADIUS_METERS = 5000;
 
     public RecommendationService(
             TourismApiClient tourismApiClient,
@@ -311,15 +312,6 @@ public class RecommendationService {
                         detailResponse
                 );
 
-        String mainAddress = extractAddress(detailResponse);
-
-        if (mainAddress == null || mainAddress.isBlank()) {
-            throw new BusinessException(
-                    ErrorCode.PLACE_NOT_FOUND,
-                    "메인 관광지의 주소를 확인할 수 없습니다."
-            );
-        }
-
         if (mainPlace == null
                 || mainPlace.getLatitude() == null
                 || mainPlace.getLongitude() == null) {
@@ -332,7 +324,7 @@ public class RecommendationService {
                 tourismApiClient.getNearbyPlaces(
                         mainPlace.getLongitude(),
                         mainPlace.getLatitude(),
-                        3000
+                        NEARBY_RADIUS_METERS
                 );
 
         List<NearbyRecommendationResponse.NearbyPlace> attractions =
@@ -378,36 +370,36 @@ public class RecommendationService {
                 continue;
             }
 
-            if (!isSameRegion(mainAddress, item.getAddr1())) {
+            if (isExcludedAccommodation(item)) {
                 continue;
             }
 
             NearbyRecommendationResponse.NearbyPlace place =
-                    tourismPlaceMapper.toNearbyPlace(item);
+                    enrichNearbyPlace(item);
 
             String contentTypeId = item.getContenttypeid();
 
             if ("39".equals(contentTypeId)) {
                 // 음식점 중 카페 키워드가 있으면 카페로 분류
                 if (isCafe(item)) {
-                    if (cafes.size() < 10) {
+                    if (cafes.size() < 20) {
                         cafes.add(place);
                     }
                 } else {
-                    if (restaurants.size() < 10) {
+                    if (restaurants.size() < 20) {
                         restaurants.add(place);
                     }
                 }
 
             } else {
-                if (attractions.size() < 10) {
+                if (attractions.size() < 20) {
                     attractions.add(place);
                 }
             }
 
-            if (attractions.size() >= 10
-                    && cafes.size() >= 10
-                    && restaurants.size() >= 10) {
+            if (attractions.size() >= 20
+                    && cafes.size() >= 20
+                    && restaurants.size() >= 20) {
                 break;
             }
         }
@@ -684,8 +676,10 @@ public class RecommendationService {
                             )
                             .name(item.getTitle())
                             .imageUrl(item.getFirstimage())
-                            .summary(
-                                    recommended.getSummary()
+                            .summary(resolveRecommendationSummary(
+                                    recommended.getSummary(),
+                                    item
+                                    )
                             )
                             .latitude(
                                     parseDouble(item.getMapy())
@@ -708,6 +702,24 @@ public class RecommendationService {
             );
         }
         return result;
+    }
+
+    private String resolveRecommendationSummary(
+            String geminiSummary,
+            TourismApiResponse.Item item
+    ) {
+        if (geminiSummary != null
+                && !geminiSummary.isBlank()) {
+            return geminiSummary;
+        }
+
+        if (item.getOverview() != null
+                && !item.getOverview().isBlank()) {
+            return item.getOverview();
+        }
+
+        return item.getTitle()
+                + " 여행 시 방문하기 좋은 관광지입니다.";
     }
 
     private boolean isCafe(
@@ -771,48 +783,6 @@ public class RecommendationService {
                         .get(0);
 
         return item.getAddr1();
-    }
-
-    private boolean isSameRegion(
-            String mainAddress,
-            String nearbyAddress
-    ) {
-        if (mainAddress == null
-                || nearbyAddress == null
-                || mainAddress.isBlank()
-                || nearbyAddress.isBlank()) {
-            return false;
-        }
-
-        String mainRegion =
-                extractCityOrCounty(mainAddress);
-
-        String nearbyRegion =
-                extractCityOrCounty(nearbyAddress);
-
-        return mainRegion != null
-                && mainRegion.equals(nearbyRegion);
-    }
-
-    private String extractCityOrCounty(
-            String address
-    ) {
-        String normalizedAddress =
-                address.replace(",", " ")
-                        .replaceAll("\\s+", " ")
-                        .trim();
-
-        String[] tokens =
-                normalizedAddress.split(" ");
-
-        for (String token : tokens) {
-            if (token.endsWith("시")
-                    || token.endsWith("군")) {
-                return token;
-            }
-        }
-
-        return null;
     }
 
     public CourseResponse generateCourse(
@@ -1552,5 +1522,118 @@ public class RecommendationService {
         return otherRegions.stream()
                 .filter(other -> !other.equals(region))
                 .anyMatch(text::contains);
+    }
+
+    private boolean isExcludedAccommodation(
+            TourismApiResponse.Item item
+    ) {
+        String contentTypeId = item.getContenttypeid();
+
+        // 관광공사 contentTypeId 32 = 숙박
+        if ("32".equals(contentTypeId)) {
+            return true;
+        }
+
+        String text = (
+                nullToEmpty(item.getTitle())
+                        + " "
+                        + nullToEmpty(item.getAddr1())
+                        + " "
+                        + nullToEmpty(item.getOverview())
+        ).toLowerCase();
+
+        List<String> excludedKeywords = List.of(
+                "펜션",
+                "캠핑장",
+                "야영장",
+                "글램핑",
+                "카라반",
+                "오토캠핑",
+                "캠프장",
+                "민박",
+                "리조트",
+                "콘도",
+                "호텔",
+                "모텔",
+                "게스트하우스",
+                "숙박"
+        );
+
+        return excludedKeywords.stream()
+                .anyMatch(text::contains);
+    }
+
+    private NearbyRecommendationResponse.NearbyPlace enrichNearbyPlace(
+            TourismApiResponse.Item item
+    ) {
+        NearbyRecommendationResponse.NearbyPlace basicPlace =
+                tourismPlaceMapper.toNearbyPlace(item);
+
+        if (basicPlace == null
+                || item.getContentid() == null
+                || item.getContentid().isBlank()) {
+            return basicPlace;
+        }
+
+        TourismApiResponse detailResponse =
+                tourismApiClient.getPlaceDetail(
+                        item.getContentid()
+                );
+
+        PlaceDetailResponse detail =
+                tourismPlaceMapper.toPlaceDetailResponse(
+                        item.getContentid(),
+                        detailResponse
+                );
+
+        if (detail == null) {
+            return basicPlace;
+        }
+
+        return NearbyRecommendationResponse.NearbyPlace.builder()
+                .placeId(basicPlace.getPlaceId())
+                .name(firstNonBlank(
+                        detail.getName(),
+                        basicPlace.getName()
+                ))
+                .imageUrl(firstNonBlank(
+                        detail.getImageUrl(),
+                        basicPlace.getImageUrl()
+                ))
+                .summary(firstNonBlank(
+                        detail.getDescription(),
+                        basicPlace.getSummary()
+                ))
+                .address(firstNonBlank(
+                        detail.getAddress(),
+                        basicPlace.getAddress()
+                ))
+                .latitude(firstNonNull(
+                        detail.getLatitude(),
+                        basicPlace.getLatitude()
+                ))
+                .longitude(firstNonNull(
+                        detail.getLongitude(),
+                        basicPlace.getLongitude()
+                ))
+                .build();
+    }
+
+    private String firstNonBlank(
+            String first,
+            String second
+    ) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+
+        return second;
+    }
+
+    private Double firstNonNull(
+            Double first,
+            Double second
+    ) {
+        return first != null ? first : second;
     }
 }

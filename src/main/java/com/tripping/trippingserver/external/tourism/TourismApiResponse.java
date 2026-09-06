@@ -61,5 +61,7 @@ public class TourismApiResponse {
         private String overview;
 
         private String dist;
+
+        private String firstimage2;
     }
 }

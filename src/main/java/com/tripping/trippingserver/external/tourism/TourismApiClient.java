@@ -106,7 +106,7 @@ public class TourismApiClient {
                     + "&mapX=" + longitude
                     + "&mapY=" + latitude
                     + "&radius=" + radius
-                    + "&numOfRows=30"
+                    + "&numOfRows=100" // 30개 -> 100개로 수정
                     + "&pageNo=1"
                     + "&arrange=E";
 
