@@ -43,6 +43,8 @@ public class TourismApiClient {
                 .build();
     }
 
+    //관광지 기본 상세정보 조회
+    //detailCommon2
     public TourismApiResponse getPlaceDetail(String contentId) {
 
         try {
@@ -90,6 +92,117 @@ public class TourismApiClient {
         }
     }
 
+    //관광지 소개정보 조회
+    //개방시간, 휴무일, 주차정보 등
+    //detailIntro2
+    public TourismApiResponse getPlaceIntro(
+            String contentId,
+            String contentTypeId
+    ) {
+
+        try {
+            String url = properties.getBaseUrl()
+                    + "/detailIntro2"
+                    + "?serviceKey=" + properties.getApiKey()
+                    + "&MobileOS=ETC"
+                    + "&MobileApp=TripPing"
+                    + "&_type=json"
+                    + "&contentId=" + contentId
+                    + "&contentTypeId=" + contentTypeId;
+
+            URI uri = URI.create(url);
+
+            String rawResponse = restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .body(String.class);
+
+            if (rawResponse == null || rawResponse.isBlank()) {
+                return null;
+            }
+
+            if (rawResponse.contains("\"items\": \"\"")
+                    || rawResponse.contains("\"items\":\"\"")) {
+                return null;
+            }
+
+            return objectMapper.readValue(
+                    rawResponse,
+                    TourismApiResponse.class
+            );
+
+        } catch (JsonProcessingException e) {
+
+            throw new BusinessException(
+                    ErrorCode.EXTERNAL_API_ERROR,
+                    "관광지 소개정보 응답을 파싱할 수 없습니다."
+            );
+
+        } catch (RestClientException e) {
+
+            throw new BusinessException(
+                    ErrorCode.EXTERNAL_API_ERROR,
+                    "관광지 소개정보 API 요청에 실패했습니다."
+            );
+        }
+    }
+
+    //관광지 추가 상세정보 조회
+    //입장료 등의 반복정보를 가져옴
+    //detailInfo2
+    public TourismApiResponse getPlaceInfo(
+            String contentId,
+            String contentTypeId
+    ) {
+
+        try {
+            String url = properties.getBaseUrl()
+                    + "/detailInfo2"
+                    + "?serviceKey=" + properties.getApiKey()
+                    + "&MobileOS=ETC"
+                    + "&MobileApp=TripPing"
+                    + "&_type=json"
+                    + "&contentId=" + contentId
+                    + "&contentTypeId=" + contentTypeId;
+
+            URI uri = URI.create(url);
+
+            String rawResponse = restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .body(String.class);
+
+            if (rawResponse == null || rawResponse.isBlank()) {
+                return null;
+            }
+
+            if (rawResponse.contains("\"items\": \"\"")
+                    || rawResponse.contains("\"items\":\"\"")) {
+                return null;
+            }
+
+            return objectMapper.readValue(
+                    rawResponse,
+                    TourismApiResponse.class
+            );
+
+        } catch (JsonProcessingException e) {
+
+            throw new BusinessException(
+                    ErrorCode.EXTERNAL_API_ERROR,
+                    "관광지 추가정보 응답을 파싱할 수 없습니다."
+            );
+
+        } catch (RestClientException e) {
+
+            throw new BusinessException(
+                    ErrorCode.EXTERNAL_API_ERROR,
+                    "관광지 추가정보 API 요청에 실패했습니다."
+            );
+        }
+    }
+
+    //위치 기반 주변 장소 조회
     public TourismApiResponse getNearbyPlaces(
             double longitude,
             double latitude,
@@ -127,6 +240,7 @@ public class TourismApiClient {
         }
     }
 
+    //관광지 키워드 검색
     public TourismApiResponse searchPlacesByKeyword(
             String keyword
     ) {
