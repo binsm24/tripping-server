@@ -309,7 +309,9 @@ public class RecommendationService {
         PlaceDetailResponse mainPlace =
                 tourismPlaceMapper.toPlaceDetailResponse(
                         contentId,
-                        detailResponse
+                        detailResponse,
+                        null,
+                        null
                 );
 
         if (mainPlace == null
@@ -1451,7 +1453,9 @@ public class RecommendationService {
         PlaceDetailResponse mainPlace =
                 tourismPlaceMapper.toPlaceDetailResponse(
                         contentId,
-                        detailResponse
+                        detailResponse,
+                        null,
+                        null
                 );
 
         if (mainPlace == null) {
@@ -1583,7 +1587,9 @@ public class RecommendationService {
         PlaceDetailResponse detail =
                 tourismPlaceMapper.toPlaceDetailResponse(
                         item.getContentid(),
-                        detailResponse
+                        detailResponse,
+                        null,
+                        null
                 );
 
         if (detail == null) {

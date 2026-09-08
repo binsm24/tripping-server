@@ -11,18 +11,21 @@ public class TourismPlaceMapper {
 
     public PlaceDetailResponse toPlaceDetailResponse(
             String contentId,
-            TourismApiResponse apiResponse
+            TourismApiResponse commonResponse,
+            TourismApiResponse introResponse,
+            TourismApiResponse infoResponse
     ) {
 
-        if (apiResponse == null
-                || apiResponse.getResponse() == null
-                || apiResponse.getResponse().getBody() == null
-                || apiResponse.getResponse().getBody().getItems() == null) {
+        // 1. 기본 상세정보 확인
+        if (commonResponse == null
+                || commonResponse.getResponse() == null
+                || commonResponse.getResponse().getBody() == null
+                || commonResponse.getResponse().getBody().getItems() == null) {
             return null;
         }
 
         List<TourismApiResponse.Item> items =
-                apiResponse.getResponse()
+                commonResponse.getResponse()
                         .getBody()
                         .getItems()
                         .getItem();
@@ -33,6 +36,18 @@ public class TourismPlaceMapper {
 
         TourismApiResponse.Item item = items.get(0);
 
+        // 2. detailIntro2의 첫 번째 항목
+        TourismApiResponse.Item introItem =
+                getFirstItem(introResponse);
+
+        // 3. detailInfo2에서 "입장료" 찾기
+        String admissionFee =
+                findInfoValue(
+                        infoResponse,
+                        "입장료"
+                );
+
+        // 4. 세 API의 정보를 하나의 응답 DTO로 합침
         return PlaceDetailResponse.builder()
                 .placeId("tourism-" + contentId)
                 .name(item.getTitle())
@@ -43,6 +58,27 @@ public class TourismPlaceMapper {
                 .latitude(toDouble(item.getMapy()))
                 .longitude(toDouble(item.getMapx()))
                 .kakaoMapUrl("https://map.kakao.com/")
+
+                // detailIntro2
+                .openingHours(
+                        introItem != null
+                                ? introItem.getUsetime()
+                                : null
+                )
+                .restDate(
+                        introItem != null
+                                ? introItem.getRestdate()
+                                : null
+                )
+                .parking(
+                        introItem != null
+                                ? introItem.getParking()
+                                : null
+                )
+
+                // detailInfo2
+                .admissionFee(admissionFee)
+
                 .build();
     }
 
@@ -60,9 +96,72 @@ public class TourismPlaceMapper {
                 .build();
     }
 
+    // detailIntro2 응답의 첫 번째 item 꺼내기
+    private TourismApiResponse.Item getFirstItem(
+            TourismApiResponse response
+    ) {
+
+        if (response == null
+                || response.getResponse() == null
+                || response.getResponse().getBody() == null
+                || response.getResponse().getBody().getItems() == null
+                || response.getResponse()
+                .getBody()
+                .getItems()
+                .getItem() == null
+                || response.getResponse()
+                .getBody()
+                .getItems()
+                .getItem()
+                .isEmpty()) {
+
+            return null;
+        }
+
+        return response.getResponse()
+                .getBody()
+                .getItems()
+                .getItem()
+                .get(0);
+    }
+
+    // detailInfo2에서 원하는 항목 찾기
+    // 예: infoname = "입장료"
+    private String findInfoValue(
+            TourismApiResponse response,
+            String infoName
+    ) {
+
+        if (response == null
+                || response.getResponse() == null
+                || response.getResponse().getBody() == null
+                || response.getResponse().getBody().getItems() == null
+                || response.getResponse()
+                .getBody()
+                .getItems()
+                .getItem() == null) {
+
+            return null;
+        }
+
+        for (TourismApiResponse.Item item :
+                response.getResponse()
+                        .getBody()
+                        .getItems()
+                        .getItem()) {
+
+            if (infoName.equals(item.getInfoname())) {
+                return item.getInfotext();
+            }
+        }
+
+        return null;
+    }
+
     private String resolveImageUrl(
             TourismApiResponse.Item item
     ) {
+
         String firstImage = item.getFirstimage();
 
         if (isValidImageUrl(firstImage)) {
@@ -81,6 +180,7 @@ public class TourismPlaceMapper {
     private boolean isValidImageUrl(
             String imageUrl
     ) {
+
         return imageUrl != null
                 && !imageUrl.isBlank()
                 && (
@@ -92,6 +192,7 @@ public class TourismPlaceMapper {
     private String resolveSummary(
             TourismApiResponse.Item item
     ) {
+
         if (item.getOverview() != null
                 && !item.getOverview().isBlank()) {
             return item.getOverview().trim();
@@ -106,7 +207,10 @@ public class TourismPlaceMapper {
         return title + " 주변 추천 장소입니다.";
     }
 
-    private String makeAddress(TourismApiResponse.Item item) {
+    private String makeAddress(
+            TourismApiResponse.Item item
+    ) {
+
         String addr1 = item.getAddr1();
         String addr2 = item.getAddr2();
 
@@ -122,12 +226,14 @@ public class TourismPlaceMapper {
     }
 
     private Double toDouble(String value) {
+
         if (value == null || value.isBlank()) {
             return null;
         }
 
         try {
             return Double.parseDouble(value);
+
         } catch (NumberFormatException e) {
             return null;
         }

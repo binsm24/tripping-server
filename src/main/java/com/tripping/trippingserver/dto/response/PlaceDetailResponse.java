@@ -62,4 +62,28 @@ public class PlaceDetailResponse {
             example = "https://map.kakao.com/"
     )
     private String kakaoMapUrl;
+
+    @Schema(
+            description = "개방시간",
+            example = "상시 개방"
+    )
+    private String openingHours;
+
+    @Schema(
+            description = "휴무일",
+            example = "연중무휴"
+    )
+    private String restDate;
+
+    @Schema(
+            description = "주차정보",
+            example = "가능"
+    )
+    private String parking;
+
+    @Schema(
+            description = "입장료",
+            example = "무료"
+    )
+    private String admissionFee;
 }

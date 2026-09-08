@@ -63,5 +63,14 @@ public class TourismApiResponse {
         private String dist;
 
         private String firstimage2;
+
+        //detailIntro2: 개방시간, 휴무일, 주차정보
+        private String usetime;
+        private String restdate;
+        private String parking;
+
+        //detailInfo2: 입장료, 가격
+        private String infoname;
+        private String infotext;
     }
 }
