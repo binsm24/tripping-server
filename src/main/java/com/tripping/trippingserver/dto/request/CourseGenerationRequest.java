@@ -54,9 +54,8 @@ public class CourseGenerationRequest {
     private String requirement;
 
     @NotNull
-    @Size(min = 1)
     @Schema(
-            description = "사용자가 코스에 추가하기로 선택한 주변 장소 ID 목록",
+            description = "사용자가 선택한 주변 장소 ID 목록. 0~4개 선택 가능",
             example = "[\"tourism-123\", \"tourism-456\", \"tourism-789\"]"
     )
     private List<String> selectedPlaceIds;

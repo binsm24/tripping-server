@@ -89,11 +89,45 @@ public class TourismPlaceMapper {
                 .placeId("tourism-" + item.getContentid())
                 .name(item.getTitle())
                 .imageUrl(resolveImageUrl(item))
-                .summary(resolveSummary(item))
+                .summary(
+                        summarize(
+                                item.getTitle(),
+                                item.getOverview()
+                        )
+                )
                 .address(makeAddress(item))
                 .latitude(toDouble(item.getMapy()))
                 .longitude(toDouble(item.getMapx()))
                 .build();
+    }
+
+    public String summarize(
+            String title,
+            String description
+    ) {
+        return resolveSummary(title, description);
+    }
+
+    private String resolveSummary(
+            String title,
+            String description
+    ) {
+        if (description == null
+                || description.isBlank()) {
+            return null;
+        }
+
+        String summary = description
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        int maxLength = 50;
+
+        if (summary.length() <= maxLength) {
+            return summary;
+        }
+
+        return summary.substring(0, maxLength).trim() + "...";
     }
 
     // detailIntro2 응답의 첫 번째 item 꺼내기
@@ -189,22 +223,32 @@ public class TourismPlaceMapper {
         );
     }
 
+    // 관광공사 API에서 주는 설명인 summary는 30자로 제한
     private String resolveSummary(
             TourismApiResponse.Item item
     ) {
-
-        if (item.getOverview() != null
-                && !item.getOverview().isBlank()) {
-            return item.getOverview().trim();
-        }
-
         String title = item.getTitle();
+        String overview = item.getOverview();
 
-        if (title == null || title.isBlank()) {
-            return "주변 추천 장소입니다.";
+        if (overview == null || overview.isBlank()) {
+            if (title == null || title.isBlank()) {
+                return "추천 장소입니다.";
+            }
+
+            return title;
         }
 
-        return title + " 주변 추천 장소입니다.";
+        String summary = overview
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        int maxLength = 30;
+
+        if (summary.length() <= maxLength) {
+            return summary;
+        }
+
+        return summary.substring(0, maxLength).trim() + "...";
     }
 
     private String makeAddress(
