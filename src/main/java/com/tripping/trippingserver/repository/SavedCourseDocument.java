@@ -18,5 +18,6 @@ public class SavedCourseDocument {
     private String description;
     private String mapImageUrl;
     private String createdAt;
+    private String expiresAt;
     private List<CourseDocument.CoursePlaceDocument> places;
 }

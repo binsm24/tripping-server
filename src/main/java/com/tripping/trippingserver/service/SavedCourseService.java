@@ -38,6 +38,12 @@ public class SavedCourseService {
                                     )
                             );
 
+            LocalDateTime createdAt =
+                    LocalDateTime.now();
+
+            LocalDateTime expiresAt =
+                    createdAt.plusMinutes(1);
+
             SavedCourseDocument savedCourse =
                     SavedCourseDocument.builder()
                             .userId(userId)
@@ -47,9 +53,8 @@ public class SavedCourseService {
                             .tags(course.getTags())
                             .description(course.getDescription())
                             .mapImageUrl(course.getMapImageUrl())
-                            .createdAt(
-                                    java.time.LocalDateTime.now().toString()
-                            )
+                            .createdAt(createdAt.toString())
+                            .expiresAt(expiresAt.toString())
                             .places(course.getPlaces())
                             .build();
 
@@ -78,6 +83,7 @@ public class SavedCourseService {
         try {
             return savedCourseRepository.findAllByUserId(userId)
                     .stream()
+                    .filter(this::isNotExpired)
                     .map(this::toSummaryResponse)
                     .toList();
 
@@ -93,6 +99,19 @@ public class SavedCourseService {
                     ErrorCode.INTERNAL_SERVER_ERROR
             );
         }
+    }
+
+    private boolean isNotExpired(
+            SavedCourseDocument document
+    ) {
+        if (document.getExpiresAt() == null
+                || document.getExpiresAt().isBlank()) {
+            return false;
+        }
+
+        return LocalDateTime.parse(
+                document.getExpiresAt()
+        ).isAfter(LocalDateTime.now());
     }
 
     public SavedCourseDetailResponse getSavedCourse(
@@ -113,6 +132,16 @@ public class SavedCourseService {
                 throw new BusinessException(
                         ErrorCode.FORBIDDEN,
                         "해당 저장 코스에 접근할 권한이 없습니다."
+                );
+            }
+
+            if (!isNotExpired(savedCourse)) {
+                savedCourseRepository.delete(
+                        savedCourse.getSavedCourseId()
+                );
+
+                throw new BusinessException(
+                        ErrorCode.SAVED_COURSE_NOT_FOUND
                 );
             }
 
@@ -139,7 +168,9 @@ public class SavedCourseService {
             SavedCourseDocument document
     ) {
         List<CoursePlaceResponse> places =
-                document.getPlaces()
+                document.getPlaces() == null
+                        ? List.of()
+                        : document.getPlaces()
                         .stream()
                         .map(place ->
                                 CoursePlaceResponse.builder()
@@ -148,8 +179,6 @@ public class SavedCourseService {
                                         .name(place.getName())
                                         .summary(place.getSummary())
                                         .imageUrl(place.getImageUrl())
-                                        // 보관함 상세 응답에서 제외할 경우
-                                        // 좌표 필드가 없는 DTO를 사용하세요.
                                         .build()
                         )
                         .toList();

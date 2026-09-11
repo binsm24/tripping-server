@@ -52,7 +52,6 @@ public class SecurityConfig {
                         )
                         .permitAll()
                         .requestMatchers(
-                                "/api/courses/**",
                                 "/api/saved-courses/**"
                         )
                         .authenticated()

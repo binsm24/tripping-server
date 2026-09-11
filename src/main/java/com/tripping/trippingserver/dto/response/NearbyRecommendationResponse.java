@@ -3,6 +3,7 @@ package com.tripping.trippingserver.dto.response;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.List;
 
@@ -72,5 +73,8 @@ public class NearbyRecommendationResponse {
                 example = "127.0573"
         )
         private Double longitude;
+
+        @JsonIgnore
+        private String sourceText;
     }
 }

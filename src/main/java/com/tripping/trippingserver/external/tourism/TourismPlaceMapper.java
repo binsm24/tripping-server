@@ -105,7 +105,29 @@ public class TourismPlaceMapper {
             String title,
             String description
     ) {
-        return resolveSummary(title, description);
+        if (description == null
+                || description.isBlank()) {
+            return title == null || title.isBlank()
+                    ? null
+                    : title;
+        }
+
+        String summary = description
+                .replaceAll("(?s)<think>.*?</think>", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        if (summary.isBlank()) {
+            return title;
+        }
+
+        int maxLength = 50;
+
+        if (summary.length() <= maxLength) {
+            return summary;
+        }
+
+        return summary.substring(0, maxLength).trim() + "...";
     }
 
     private String resolveSummary(
