@@ -58,3 +58,8 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.named('processResources') {
+    exclude 'application-local.*', 'application-secret.*', 'application-prod.*'
+    exclude '**/*service-account*', '**/*firebase-adminsdk*'
+}

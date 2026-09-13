@@ -1,0 +1,18 @@
+FROM eclipse-temurin:21-jdk-noble AS build
+WORKDIR /build
+COPY gradlew build.gradle settings.gradle ./
+COPY gradle ./gradle
+COPY src ./src
+RUN chmod +x gradlew && ./gradlew --no-daemon test bootJar
+
+# Must match com.microsoft.playwright:playwright in build.gradle.
+FROM mcr.microsoft.com/playwright/java:v1.58.0-noble
+WORKDIR /app
+COPY --from=build /build/build/libs/*-SNAPSHOT.jar /app/app.jar
+ENV PORT=8080 \
+    COURSE_MAP_BROWSER_CHANNEL="" \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    TZ=Asia/Seoul \
+    JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=50.0 -Djava.io.tmpdir=/tmp"
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

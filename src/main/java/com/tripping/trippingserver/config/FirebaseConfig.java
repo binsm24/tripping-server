@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Configuration;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.util.Base64;
 
 @Configuration
 public class FirebaseConfig {
@@ -21,24 +23,34 @@ public class FirebaseConfig {
     @Value("${firebase.service-account-path}")
     private String serviceAccountPath;
 
+    @Value("${firebase.service-account-base64:}")
+    private String serviceAccountBase64;
+
     @Bean(destroyMethod = "delete")
     public FirebaseApp firebaseApp() throws IOException {
         if (!FirebaseApp.getApps().isEmpty()) {
             return FirebaseApp.getInstance();
         }
 
-        try (FileInputStream serviceAccount =
-                     new FileInputStream(serviceAccountPath)) {
+        FirebaseOptions options = FirebaseOptions.builder()
+                .setCredentials(credentials())
+                .setProjectId(projectId)
+                .build();
+        return FirebaseApp.initializeApp(options);
+    }
 
-            FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(
-                            GoogleCredentials.fromStream(serviceAccount)
-                    )
-                    .setProjectId(projectId)
-                    .build();
-
-            return FirebaseApp.initializeApp(options);
+    private GoogleCredentials credentials() throws IOException {
+        if (!serviceAccountBase64.isBlank()) {
+            try (var input = new ByteArrayInputStream(Base64.getDecoder().decode(serviceAccountBase64))) {
+                return GoogleCredentials.fromStream(input);
+            }
         }
+        if (!serviceAccountPath.isBlank()) {
+            try (var input = new FileInputStream(serviceAccountPath)) {
+                return GoogleCredentials.fromStream(input);
+            }
+        }
+        return GoogleCredentials.getApplicationDefault();
     }
 
     @Bean

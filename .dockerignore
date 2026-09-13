@@ -1,0 +1,14 @@
+**
+!Dockerfile.vercel
+!build.gradle
+!settings.gradle
+!gradlew
+!gradle/
+!gradle/**
+!src/
+!src/**
+src/**/application-local.*
+src/**/application-secret.*
+src/**/application-prod.*
+src/**/*service-account*
+src/**/*firebase-adminsdk*
