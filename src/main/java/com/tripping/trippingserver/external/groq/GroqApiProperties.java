@@ -10,6 +10,15 @@ public class GroqApiProperties {
     private final String baseUrl;
     private final String model;
 
+    @Value("${groq.max-output-tokens:600}")
+    private int maxOutputTokens = 600;
+
+    @Value("${groq.output-tokens-per-minute:1000}")
+    private int outputTokensPerMinute = 1000;
+
+    public int getMaxOutputTokens() { return maxOutputTokens; }
+    public int getOutputTokensPerMinute() { return outputTokensPerMinute; }
+
     public GroqApiProperties(
             @Value("${groq.api-key}") String apiKey,
             @Value("${groq.base-url}") String baseUrl,

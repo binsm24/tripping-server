@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<style>html,body{margin:0;width:630px;height:346px;overflow:hidden}#map{width:630px;height:346px}.pin{width:30px;height:40px;filter:drop-shadow(0 2px 2px #0004)}</style>
+</head><body><div id="map"></div>
+<script>
+window.mapReady=false;
+window.mapError=null;
+window.onerror=()=>{window.mapError='map script failed'};
+const points=__POINTS__;
+function initMap(){
+ kakao.maps.load(()=>{
+  const map=new kakao.maps.Map(document.getElementById('map'),{
+   center:new kakao.maps.LatLng(points[0].lat,points[0].lng),level:5,
+   draggable:false,scrollwheel:false,disableDoubleClickZoom:true
+  });
+  let readyTimer;
+  kakao.maps.event.addListener(map,'tilesloaded',()=>{
+   clearTimeout(readyTimer);
+   readyTimer=setTimeout(()=>{
+    const images=[...document.querySelectorAll('#map img')];
+    if(images.length && images.every(img=>img.complete && img.naturalWidth>0)) window.mapReady=true;
+   },500);
+  });
+  const bounds=new kakao.maps.LatLngBounds();
+  points.forEach(p=>{
+   const position=new kakao.maps.LatLng(p.lat,p.lng);bounds.extend(position);
+   const content=document.createElement('div');content.className='pin';
+   content.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="30" height="40" viewBox="0 0 30 40"><path fill="#FF9F50" stroke="white" stroke-width="1.5" d="M15 39C12 34 1 23 1 15a14 14 0 0 1 28 0c0 8-11 19-14 24Z"/><circle cx="15" cy="15" r="5" fill="white"/></svg>';
+   new kakao.maps.CustomOverlay({map,position,content,yAnchor:1,zIndex:10});
+  });
+  if(points.length>1)map.setBounds(bounds,55,45,40,45);
+ });
+}
+const sdk=document.createElement('script');
+sdk.src='https://dapi.kakao.com/v2/maps/sdk.js?appkey=__SDK_KEY__&autoload=false';
+sdk.onload=initMap;sdk.onerror=()=>window.mapError='SDK load failed';document.head.appendChild(sdk);
+</script></body></html>

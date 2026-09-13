@@ -10,6 +10,8 @@ import java.util.List;
 
 @Getter
 @NoArgsConstructor
+@lombok.AllArgsConstructor
+@lombok.Builder(toBuilder = true)
 @Schema(description = "AI 여행 코스 생성 요청")
 public class CourseGenerationRequest {
 
@@ -23,13 +25,12 @@ public class CourseGenerationRequest {
     @NotBlank
     @Schema(
             description = "메인 추천 세션 ID",
-            example = "test-session-001"
+            example = "메인 추천 응답의 recommendationSessionId"
     )
     private String recommendationSessionId;
 
-    @NotBlank
     @Schema(
-            description = "여행 지역",
+            description = "여행 지역. 실제 코스에는 추천 세션의 확정 지역을 사용합니다.",
             example = "양평"
     )
     private String region;
@@ -58,5 +59,6 @@ public class CourseGenerationRequest {
             description = "사용자가 선택한 주변 장소 ID 목록. 0~4개 선택 가능",
             example = "[\"tourism-123\", \"tourism-456\", \"tourism-789\"]"
     )
-    private List<String> selectedPlaceIds;
+    @Size(max = 4)
+    private List<@NotBlank String> selectedPlaceIds;
 }

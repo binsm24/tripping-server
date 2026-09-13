@@ -38,7 +38,12 @@ public class SecurityConfig {
                                 SessionCreationPolicy.STATELESS
                         )
                 )
+                .exceptionHandling(errors -> errors
+                        .authenticationEntryPoint(new com.tripping.trippingserver.security.ApiAuthenticationEntryPoint())
+                )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/courses")
+                        .permitAll()
                         .requestMatchers(
                                 "/",
                                 "/health",

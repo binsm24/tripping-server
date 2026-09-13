@@ -21,7 +21,7 @@ public class FirebaseConfig {
     @Value("${firebase.service-account-path}")
     private String serviceAccountPath;
 
-    @Bean
+    @Bean(destroyMethod = "delete")
     public FirebaseApp firebaseApp() throws IOException {
         if (!FirebaseApp.getApps().isEmpty()) {
             return FirebaseApp.getInstance();

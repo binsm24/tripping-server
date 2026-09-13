@@ -29,26 +29,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = resolveToken(request);
 
-        if (token != null
-                && jwtTokenProvider.validateToken(token)) {
-
-            String userId =
-                    jwtTokenProvider.getUserId(token);
-
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userId,
-                            null,
-                            List.of(
-                                    new SimpleGrantedAuthority(
-                                            "ROLE_USER"
-                                    )
-                            )
-                    );
-
-            SecurityContextHolder
-                    .getContext()
-                    .setAuthentication(authentication);
+        if (token != null) {
+            try {
+                // Parse once so expiration cannot occur between validation and subject lookup.
+                String userId = jwtTokenProvider.getUserId(token);
+                if (userId == null || userId.isBlank()) {
+                    request.setAttribute("jwt.failure", "invalid");
+                } else {
+                    SecurityContextHolder.getContext().setAuthentication(
+                            new UsernamePasswordAuthenticationToken(userId, null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+                }
+            } catch (io.jsonwebtoken.ExpiredJwtException exception) {
+                SecurityContextHolder.clearContext();
+                request.setAttribute("jwt.failure", "expired");
+            } catch (io.jsonwebtoken.JwtException | IllegalArgumentException exception) {
+                SecurityContextHolder.clearContext();
+                request.setAttribute("jwt.failure", "invalid");
+            }
         }
 
         filterChain.doFilter(request, response);

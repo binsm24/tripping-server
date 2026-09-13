@@ -33,6 +33,7 @@ public class CourseResponse {
 
     private String description;
 
+    @Schema(description = "카카오 지도와 주황색 선택 장소 핀을 캡처한 PNG data URL. 이미지 src 또는 CSS 배경으로 사용합니다.")
     private String mapImageUrl;
 
     private List<CoursePlaceResponse> places;

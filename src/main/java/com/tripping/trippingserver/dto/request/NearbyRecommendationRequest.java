@@ -20,7 +20,7 @@ public class NearbyRecommendationRequest {
     @NotBlank
     @Schema(
             description = "메인 관광지 추천 세션 ID",
-            example = "test-session-001"
+            example = "메인 추천 응답의 recommendationSessionId"
     )
     private String recommendationSessionId;
 }

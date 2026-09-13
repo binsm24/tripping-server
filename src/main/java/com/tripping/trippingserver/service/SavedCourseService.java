@@ -42,7 +42,7 @@ public class SavedCourseService {
                     LocalDateTime.now();
 
             LocalDateTime expiresAt =
-                    createdAt.plusMinutes(1);
+                    createdAt.plusDays(30);
 
             SavedCourseDocument savedCourse =
                     SavedCourseDocument.builder()
@@ -179,6 +179,8 @@ public class SavedCourseService {
                                         .name(place.getName())
                                         .summary(place.getSummary())
                                         .imageUrl(place.getImageUrl())
+                                        .latitude(place.getLatitude())
+                                        .longitude(place.getLongitude())
                                         .build()
                         )
                         .toList();
@@ -205,6 +207,11 @@ public class SavedCourseService {
                 .savedCourseId(document.getSavedCourseId())
                 .courseId(document.getCourseId())
                 .courseTitle(document.getCourseTitle())
+                .tags(
+                        document.getTags() == null
+                                ? List.of()
+                                : document.getTags()
+                )
                 .estimatedDuration(document.getEstimatedDuration())
                 .mapImageUrl(document.getMapImageUrl())
                 .createdAt(
