@@ -41,6 +41,11 @@ public enum ErrorCode {
             "저장된 코스를 찾을 수 없습니다."
     ),
 
+    AI_DAILY_QUOTA_EXCEEDED(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "AI 여행 추천 서비스의 일일 사용 한도가 소진되었습니다. 한도 초기화 후 다시 이용해 주세요."
+    ),
+
     EXTERNAL_API_ERROR(
             HttpStatus.BAD_GATEWAY,
             "외부 API 요청 중 오류가 발생했습니다."

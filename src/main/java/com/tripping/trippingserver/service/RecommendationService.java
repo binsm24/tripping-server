@@ -11,10 +11,15 @@ import com.tripping.trippingserver.dto.response.RecommendationResponse;
 import com.tripping.trippingserver.exception.BusinessException;
 import com.tripping.trippingserver.exception.ErrorCode;
 import com.tripping.trippingserver.external.gemini.GeminiApiClient;
+import com.tripping.trippingserver.external.groq.GroqApiClient;
 import com.tripping.trippingserver.external.tourism.TourismApiClient;
 import com.tripping.trippingserver.external.tourism.TourismApiResponse;
 import com.tripping.trippingserver.external.tourism.TourismPlaceMapper;
+import com.tripping.trippingserver.repository.CourseRepository;
 import org.springframework.stereotype.Service;
+import com.tripping.trippingserver.repository.CourseDocument;
+import java.time.LocalDateTime;
+import java.util.concurrent.ExecutionException;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -33,6 +38,16 @@ import com.tripping.trippingserver.dto.response.CourseResponse;
 
 @Service
 public class RecommendationService {
+    private static <T> T timed(String stage, java.util.function.Supplier<T> action) {
+        long started = System.nanoTime();
+        try { return action.get(); }
+        finally {
+            org.slf4j.LoggerFactory.getLogger(RecommendationService.class).info(
+                    "[RecommendationTiming] trace={} stage={} elapsedMs={}",
+                    org.slf4j.MDC.get("recommendationTrace"), stage, (System.nanoTime() - started) / 1_000_000);
+        }
+    }
+
 
     private final TourismApiClient tourismApiClient;
     private final TourismPlaceMapper tourismPlaceMapper;
@@ -40,30 +55,40 @@ public class RecommendationService {
     private final PredefinedPlaceCandidateService candidateService;
     private final ObjectMapper objectMapper;
     private static final int NEARBY_RADIUS_METERS = 5000;
+    private final GroqApiClient groqApiClient;
+    private final CourseRepository courseRepository;
+    private final com.tripping.trippingserver.repository.RecommendationSessionRepository sessions;
+    private final CourseMapImageService mapImages;
 
     public RecommendationService(
             TourismApiClient tourismApiClient,
             TourismPlaceMapper tourismPlaceMapper,
             GeminiApiClient geminiApiClient,
+            GroqApiClient groqApiClient,
             PredefinedPlaceCandidateService candidateService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            CourseRepository courseRepository,
+            com.tripping.trippingserver.repository.RecommendationSessionRepository sessions,
+            CourseMapImageService mapImages
     ) {
         this.tourismApiClient = tourismApiClient;
         this.tourismPlaceMapper = tourismPlaceMapper;
         this.geminiApiClient = geminiApiClient;
+        this.groqApiClient = groqApiClient;
         this.candidateService = candidateService;
         this.objectMapper = objectMapper;
+        this.courseRepository = courseRepository;
+        this.sessions = sessions;
+        this.mapImages = mapImages;
     }
 
     public RecommendationResponse recommend(
             RecommendationRequest request
     ) {
-        String selectedRegion = resolveRegion(request);
+        String selectedRegion = timed("region.resolve", () -> resolveRegion(request));
 
         TourismApiResponse tourismResponse =
-                tourismApiClient.searchPlacesByKeyword(
-                        selectedRegion
-                );
+                timed("tourism.search", () -> tourismApiClient.searchPlacesByKeyword(selectedRegion));
 
         List<TourismApiResponse.Item> candidateItems =
                 getValidCandidateItems(tourismResponse);
@@ -82,10 +107,11 @@ public class RecommendationService {
                         candidateItems
                 );
 
+        var session = timed("firestore.session-save", () -> sessions.create(request, selectedRegion, places));
         return RecommendationResponse.builder()
                 .selectedRegion(selectedRegion)
                 .title(selectedRegion + " 맞춤 여행 추천")
-                .recommendationSessionId("test-session-001")
+                .recommendationSessionId(session.id())
                 .places(places)
                 .build();
     }
@@ -131,7 +157,7 @@ public class RecommendationService {
             return selectRegionByGemini(request);
         }
 
-        String normalizedRegion = region.trim();
+        String normalizedRegion = normalizeRegion(region);
 
         // region 직접 입력: 경기도인지 검증
         if (!isGyeonggiRegion(normalizedRegion)) {
@@ -148,7 +174,6 @@ public class RecommendationService {
             String region
     ) {
         List<String> gyeonggiRegions = List.of(
-                "경기도",
                 "수원",
                 "성남",
                 "고양",
@@ -158,7 +183,10 @@ public class RecommendationService {
                 "안양",
                 "남양주",
                 "화성",
+                "오산",
+                "안성",
                 "평택",
+                "포천",
                 "의정부",
                 "시흥",
                 "파주",
@@ -169,8 +197,6 @@ public class RecommendationService {
                 "이천",
                 "양주",
                 "구리",
-                "안성",
-                "포천",
                 "의왕",
                 "하남",
                 "여주",
@@ -181,8 +207,13 @@ public class RecommendationService {
                 "연천"
         );
 
-        return gyeonggiRegions.stream()
-                .anyMatch(region::contains);
+        return gyeonggiRegions.contains(normalizeRegion(region));
+    }
+
+    private String normalizeRegion(String region) {
+        return region.trim()
+                .replaceFirst("^(경기도|경기)\\s*", "")
+                .replaceFirst("[시군]$", "");
     }
 
     private boolean isGyeonggiPlace(
@@ -349,9 +380,9 @@ public class RecommendationService {
 
             return NearbyRecommendationResponse.builder()
                     .mainPlaceId(mainPlaceId)
-                    .attractions(attractions)
-                    .cafes(cafes)
-                    .restaurants(restaurants)
+                    .attractions(List.of())
+                    .cafes(List.of())
+                    .restaurants(List.of())
                     .build();
         }
 
@@ -384,27 +415,52 @@ public class RecommendationService {
             if ("39".equals(contentTypeId)) {
                 // 음식점 중 카페 키워드가 있으면 카페로 분류
                 if (isCafe(item)) {
-                    if (cafes.size() < 20) {
+                    if (cafes.size() < 5) {
                         cafes.add(place);
                     }
                 } else {
-                    if (restaurants.size() < 20) {
+                    if (restaurants.size() < 5) {
                         restaurants.add(place);
                     }
                 }
 
             } else {
-                if (attractions.size() < 20) {
+                if (attractions.size() < 5) {
                     attractions.add(place);
                 }
             }
 
-            if (attractions.size() >= 20
-                    && cafes.size() >= 20
-                    && restaurants.size() >= 20) {
+            if (attractions.size() >= 5
+                    && cafes.size() >= 5
+                    && restaurants.size() >= 5) {
                 break;
             }
         }
+
+        Map<String, String> groqSummaries =
+                generateBatchSummaries(
+                        attractions,
+                        cafes,
+                        restaurants
+                );
+
+        attractions =
+                applyGroqSummaries(
+                        attractions,
+                        groqSummaries
+                );
+
+        cafes =
+                applyGroqSummaries(
+                        cafes,
+                        groqSummaries
+                );
+
+        restaurants =
+                applyGroqSummaries(
+                        restaurants,
+                        groqSummaries
+                );
 
         return NearbyRecommendationResponse.builder()
                 .mainPlaceId(mainPlaceId)
@@ -414,12 +470,207 @@ public class RecommendationService {
                 .build();
     }
 
+    private Map<String, String> generateBatchSummaries(
+            List<NearbyRecommendationResponse.NearbyPlace> attractions,
+            List<NearbyRecommendationResponse.NearbyPlace> cafes,
+            List<NearbyRecommendationResponse.NearbyPlace> restaurants
+    ) {
+        List<NearbyRecommendationResponse.NearbyPlace> allPlaces =
+                new ArrayList<>();
+
+        if (attractions != null) {
+            allPlaces.addAll(attractions);
+        }
+
+        if (cafes != null) {
+            allPlaces.addAll(cafes);
+        }
+
+        if (restaurants != null) {
+            allPlaces.addAll(restaurants);
+        }
+
+        List<GroqApiClient.SummaryTarget> targets =
+                allPlaces.stream()
+                        .filter(Objects::nonNull)
+                        .filter(place ->
+                                place.getPlaceId() != null
+                                        && !place.getPlaceId().isBlank()
+                        )
+                        .filter(place ->
+                                place.getName() != null
+                                        && !place.getName().isBlank()
+                        )
+                        .filter(place ->
+                                place.getSourceText() != null
+                                        && !place.getSourceText().isBlank()
+                        )
+                        .map(place ->
+                                new GroqApiClient.SummaryTarget(
+                                        place.getPlaceId(),
+                                        place.getName(),
+                                        place.getSourceText()
+                                )
+                        )
+                        .toList();
+
+        if (targets.isEmpty()) {
+            return Map.of();
+        }
+
+        System.out.println(
+                "[Groq] batch summary request count: "
+                        + targets.size()
+        );
+
+        return timed("groq.nearby-summaries", () -> groqApiClient.summarizePlaces(targets));
+    }
+
+    private List<NearbyRecommendationResponse.NearbyPlace>
+    applyGroqSummaries(
+            List<NearbyRecommendationResponse.NearbyPlace> places,
+            Map<String, String> groqSummaries
+    ) {
+        if (places == null || places.isEmpty()) {
+            return List.of();
+        }
+
+        return places.stream()
+                .map(place -> {
+                    if (place == null) {
+                        return null;
+                    }
+
+                    String generatedSummary =
+                            groqSummaries.get(
+                                    place.getPlaceId()
+                            );
+
+                    String finalSummary =
+                            generatedSummary;
+
+                    if (finalSummary == null
+                            || finalSummary.isBlank()) {
+                        finalSummary = place.getSummary();
+                    }
+
+                    if (finalSummary == null
+                            || finalSummary.isBlank()) {
+                        finalSummary = place.getName();
+                    }
+
+                    return NearbyRecommendationResponse.NearbyPlace
+                            .builder()
+                            .placeId(place.getPlaceId())
+                            .name(place.getName())
+                            .imageUrl(place.getImageUrl())
+                            .summary(
+                                    tourismPlaceMapper.summarize(
+                                            place.getName(),
+                                            finalSummary
+                                    )
+                            )
+                            .address(place.getAddress())
+                            .latitude(place.getLatitude())
+                            .longitude(place.getLongitude())
+                            .sourceText(place.getSourceText())
+                            .build();
+                })
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private NearbyRecommendationResponse.NearbyPlace enrichNearbyPlace(
+            TourismApiResponse.Item item
+    ) {
+        NearbyRecommendationResponse.NearbyPlace basicPlace =
+                tourismPlaceMapper.toNearbyPlace(item);
+
+        if (basicPlace == null) {
+            return null;
+        }
+
+        String name = basicPlace.getName();
+        String description = null;
+
+        TourismApiResponse detailResponse = null;
+
+        if (item.getContentid() != null
+                && !item.getContentid().isBlank()) {
+
+            detailResponse =
+                    tourismApiClient.getPlaceDetail(
+                            item.getContentid()
+                    );
+        }
+
+        if (detailResponse != null) {
+            PlaceDetailResponse detail =
+                    tourismPlaceMapper.toPlaceDetailResponse(
+                            item.getContentid(),
+                            detailResponse,
+                            null,
+                            null
+                    );
+
+            if (detail != null) {
+                name = firstNonBlank(
+                        detail.getName(),
+                        name
+                );
+
+                description = detail.getDescription();
+            }
+        }
+
+        String sourceText = firstNonBlank(
+                item.getOverview(),
+                description
+        );
+
+        String fallbackSummary =
+                tourismPlaceMapper.summarize(
+                        name,
+                        sourceText
+                );
+
+        if (fallbackSummary == null
+                || fallbackSummary.isBlank()) {
+            fallbackSummary = name;
+        }
+
+        return NearbyRecommendationResponse.NearbyPlace.builder()
+                .placeId(basicPlace.getPlaceId())
+                .name(name)
+                .imageUrl(basicPlace.getImageUrl())
+                .summary(fallbackSummary)
+                .address(basicPlace.getAddress())
+                .latitude(basicPlace.getLatitude())
+                .longitude(basicPlace.getLongitude())
+                .sourceText(sourceText)
+                .build();
+    }
+
+    private String firstNonBlank(
+            String first,
+            String second
+    ) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+
+        return second;
+    }
+
     public NearbyRecommendationResponse recommendNearby(
             NearbyRecommendationRequest request
     ) {
-        return recommendNearbyByPlaceId(
-                request.getMainPlaceId()
-        );
+        var session = sessions.get(request.getRecommendationSessionId());
+        session.mainPlace(request.getMainPlaceId());
+        if (session.nearby().containsKey(request.getMainPlaceId()))
+            return session.nearbyResponse(request.getMainPlaceId());
+        return sessions.saveNearby(session.id(), request.getMainPlaceId(),
+                recommendNearbyByPlaceId(request.getMainPlaceId()));
     }
 
     private boolean hasValidCoordinates(
@@ -438,21 +689,57 @@ public class RecommendationService {
                 .placeId("tourism-" + item.getContentid())
                 .name(item.getTitle())
                 .imageUrl(item.getFirstimage())
-                .summary(makeSummary(item))
+                .summary(makeMainPlaceSummary(item))
                 .latitude(parseDouble(item.getMapy()))
                 .longitude(parseDouble(item.getMapx()))
                 .build();
     }
 
-    private String makeSummary(
+    private String makeMainPlaceSummary(
             TourismApiResponse.Item item
     ) {
-        if (item.getOverview() != null
-                && !item.getOverview().isBlank()) {
-            return item.getOverview();
+        String title = item.getTitle();
+        String overview = item.getOverview();
+
+        return tourismPlaceMapper.summarize(
+                title,
+                overview
+        );
+    }
+
+    private String makeMainPlaceSummaryWithDetail(
+            TourismApiResponse.Item item
+    ) {
+        String title = item.getTitle();
+        String overview = item.getOverview();
+
+        String sourceText = overview;
+
+        if (sourceText == null
+                || sourceText.isBlank()) {
+
+            TourismApiResponse detailResponse =
+                    tourismApiClient.getPlaceDetail(
+                            item.getContentid()
+                    );
+
+            PlaceDetailResponse detail =
+                    tourismPlaceMapper.toPlaceDetailResponse(
+                            item.getContentid(),
+                            detailResponse,
+                            null,
+                            null
+                    );
+
+            if (detail != null) {
+                sourceText = detail.getDescription();
+            }
         }
 
-        return "경기도 " + item.getTitle() + " 관광지입니다.";
+        return tourismPlaceMapper.summarize(
+                title,
+                sourceText
+        );
     }
 
     private Double parseDouble(
@@ -530,8 +817,7 @@ public class RecommendationService {
                 candidateJson
         );
 
-        String rawResponse =
-                geminiApiClient.generateContent(prompt);
+        String rawResponse = timed("gemini.main-selection", () -> geminiApiClient.generateContent(prompt));
 
         GeminiPlaceRecommendationResponse geminiResponse =
                 parseGeminiPlaceRecommendation(rawResponse);
@@ -645,6 +931,9 @@ public class RecommendationService {
         List<RecommendationResponse.RecommendedPlace> result =
                 new ArrayList<>();
 
+        List<GroqApiClient.SummaryTarget> summaryTargets =
+                new ArrayList<>();
+
         Set<String> selectedPlaceIds =
                 new HashSet<>();
 
@@ -671,6 +960,18 @@ public class RecommendationService {
                 continue;
             }
 
+            String sourceText = timed("tourism.main-detail", () -> resolveMainPlaceSourceText(item));
+
+            if (sourceText != null && !sourceText.isBlank()) {
+                summaryTargets.add(
+                        new GroqApiClient.SummaryTarget(
+                                placeId,
+                                item.getTitle(),
+                                sourceText
+                        )
+                );
+            }
+
             result.add(
                     RecommendationResponse.RecommendedPlace.builder()
                             .placeId(
@@ -678,9 +979,10 @@ public class RecommendationService {
                             )
                             .name(item.getTitle())
                             .imageUrl(item.getFirstimage())
-                            .summary(resolveRecommendationSummary(
-                                    recommended.getSummary(),
-                                    item
+                            .summary(
+                                    tourismPlaceMapper.summarize(
+                                            item.getTitle(),
+                                            sourceText
                                     )
                             )
                             .latitude(
@@ -703,25 +1005,84 @@ public class RecommendationService {
                     "Gemini가 중복되거나 유효하지 않은 관광지를 반환했습니다."
             );
         }
-        return result;
+        Map<String, String> groqSummaries =
+                timed("groq.main-summaries", () -> groqApiClient.summarizePlaces(summaryTargets));
+
+        return result.stream()
+                .map(place -> {
+                    String summary =
+                            groqSummaries.get(place.getPlaceId());
+
+                    if (summary == null || summary.isBlank()) {
+                        summary = place.getSummary();
+                    }
+
+                    return RecommendationResponse.RecommendedPlace
+                            .builder()
+                            .placeId(place.getPlaceId())
+                            .name(place.getName())
+                            .imageUrl(place.getImageUrl())
+                            .summary(
+                                    tourismPlaceMapper.summarize(
+                                            place.getName(),
+                                            summary
+                                    )
+                            )
+                            .latitude(place.getLatitude())
+                            .longitude(place.getLongitude())
+                            .build();
+                })
+                .toList();
     }
 
-    private String resolveRecommendationSummary(
-            String geminiSummary,
+    private String resolveMainPlaceSourceText(
             TourismApiResponse.Item item
     ) {
-        if (geminiSummary != null
-                && !geminiSummary.isBlank()) {
-            return geminiSummary;
+        String sourceText = item.getOverview();
+
+        if (sourceText == null || sourceText.isBlank()) {
+            TourismApiResponse detailResponse =
+                    tourismApiClient.getPlaceDetail(
+                            item.getContentid()
+                    );
+
+            PlaceDetailResponse detail =
+                    tourismPlaceMapper.toPlaceDetailResponse(
+                            item.getContentid(),
+                            detailResponse,
+                            null,
+                            null
+                    );
+
+            if (detail != null) {
+                sourceText = detail.getDescription();
+            }
         }
 
-        if (item.getOverview() != null
-                && !item.getOverview().isBlank()) {
-            return item.getOverview();
+        return sourceText;
+    }
+
+    private String makeShortSummary(
+            String title,
+            String description
+    ) {
+        if (description == null || description.isBlank()) {
+            return title == null || title.isBlank()
+                    ? "추천 장소입니다."
+                    : title;
         }
 
-        return item.getTitle()
-                + " 여행 시 방문하기 좋은 관광지입니다.";
+        String summary = description
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        int maxLength = 30;
+
+        if (summary.length() <= maxLength) {
+            return summary;
+        }
+
+        return summary.substring(0, maxLength).trim() + "...";
     }
 
     private boolean isCafe(
@@ -790,10 +1151,19 @@ public class RecommendationService {
     public CourseResponse generateCourse(
             CourseGenerationRequest request
     ) {
+        var session = sessions.get(request.getRecommendationSessionId());
+        var recommendedMain = session.mainPlace(request.getMainPlaceId());
+        request = request.toBuilder().region(session.region()).travelType(session.travelType())
+                .age(session.age()).companion(session.companion()).requirement(session.requirement()).build();
         NearbyRecommendationResponse nearbyResponse =
-                recommendNearbyByPlaceId(
-                        request.getMainPlaceId()
-                );
+                request.getSelectedPlaceIds() != null && request.getSelectedPlaceIds().isEmpty()
+                        ? NearbyRecommendationResponse.builder()
+                                .mainPlaceId(request.getMainPlaceId())
+                                .attractions(List.of())
+                                .cafes(List.of())
+                                .restaurants(List.of())
+                                .build()
+                        : session.nearbyResponse(request.getMainPlaceId());
 
         validateSelectedPlaceIds(
                 nearbyResponse,
@@ -807,9 +1177,10 @@ public class RecommendationService {
                 );
 
         CoursePlaceResponse mainPlace =
-                createMainCoursePlace(
-                        request.getMainPlaceId()
-                );
+                CoursePlaceResponse.builder().order(1).placeId(recommendedMain.placeId())
+                        .name(recommendedMain.name()).summary(recommendedMain.summary())
+                        .imageUrl(recommendedMain.imageUrl()).latitude(recommendedMain.latitude())
+                        .longitude(recommendedMain.longitude()).build();
 
         String prompt =
                 buildCoursePrompt(
@@ -819,21 +1190,70 @@ public class RecommendationService {
                 );
 
         String rawResponse =
-                geminiApiClient.generateContent(
-                        prompt
-                );
+                geminiApiClient.generateContent(prompt);
 
         GeminiCourseResponse geminiResponse =
-                parseCourseResponse(
-                        rawResponse
+                parseCourseResponse(rawResponse);
+
+        CourseResponse response =
+                mergeCourseResult(
+                        geminiResponse,
+                        mainPlace,
+                        selectedNearby,
+                        request
                 );
 
-        return mergeCourseResult(
-                geminiResponse,
-                mainPlace,
-                selectedNearby,
-                request
-        );
+        try {
+            CourseDocument document =
+                    toCourseDocument(response);
+
+            courseRepository.save(document);
+
+            return response;
+
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+
+        } catch (ExecutionException exception) {
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    private CourseDocument toCourseDocument(
+            CourseResponse response
+    ) {
+        List<CourseDocument.CoursePlaceDocument> places =
+                response.getPlaces()
+                        .stream()
+                        .map(place ->
+                                CourseDocument.CoursePlaceDocument.builder()
+                                        .order(place.getOrder())
+                                        .placeId(place.getPlaceId())
+                                        .name(place.getName())
+                                        .summary(place.getSummary())
+                                        .imageUrl(place.getImageUrl())
+                                        .latitude(place.getLatitude())
+                                        .longitude(place.getLongitude())
+                                        .build()
+                        )
+                        .toList();
+
+        return CourseDocument.builder()
+                .courseId(response.getCourseId())
+                .courseTitle(response.getCourseTitle())
+                .estimatedDuration(response.getEstimatedDuration())
+                .tags(response.getTags())
+                .description(response.getDescription())
+                .mapImageUrl(response.getMapImageUrl())
+                .places(places)
+                .createdAt(LocalDateTime.now().toString())
+                .build();
     }
 
     private String buildCoursePrompt(
@@ -898,21 +1318,26 @@ public class RecommendationService {
             4. 방문 순서를 1부터 지정한다.
             5. 최종 코스의 첫 번재 장소는 항상 메인 관광지다.
             6. 같은 placeId를 중복 사용하지 않는다.
-            7. 최소 3개 이상의 장소를 선택한다.
-            8. 모든 장소는 입력한 지역 주변 장소 목록에서만 선택한다.
-            9. 반드시 JSON 객체 하나만 반환한다.
-            10. 마크다운 코드 블록은 사용하지 않는다.
+            7. 메인 관광지는 반드시 포함한다.
+            8. 사용자가 선택한 주변 장소는 반드시 모두 포함한다. 일부를 생략하지 않는다.
+            9. 주변 장소를 선택하지 않은 경우 메인 관광지만 반환한다.
+            10. 장소 수는 입력된 장소 수를 초과하지 않는다.
             11. 여행 지역은 반드시 "%s"로 고정한다.
             12. course title에 다른 지역명을 절대 포함하지 않는다.
             13. description과 tags에도 다른 지역명을 포함하지 않는다.
             14. 강릉, 서울, 부산, 제주 등 입력 지역이 아닌 지역을 절대 언급하지 않는다.
+            15. 주변 장소가 0개여도 메인 관광지 1개는 반드시 places에 포함한다.
+            16. 메인 관광지의 visitOrder는 반드시 "1"이다.
+            17. tags에는 여행 분위기나 코스 특징을 나타내는 태그를 최대 1개만 작성한다.
+            18. 여행 유형, 동반자, 지역 태그는 작성하지 않는다.
+            19. 여행 유형, 동반자, 지역 태그들은 백엔드가 추가한다.
             
             응답 형식:
             {
               "title": "코스 제목",
               "totalDuration": "약 6시간",
               "description": "코스 설명",
-              "tags": ["자연", "산책", "카페"],
+              "tags": ["힐링"],
               "places": [
                 {
                   "placeId": "tourism-123",
@@ -1009,10 +1434,10 @@ public class RecommendationService {
                     );
 
             if (response.getPlaces() == null
-                    || response.getPlaces().size() < 3) {
+                    || response.getPlaces().isEmpty()) {
                 throw new BusinessException(
                         ErrorCode.EXTERNAL_API_ERROR,
-                        "Gemini가 3개 이상의 코스 장소를 반환하지 않았습니다."
+                        "Gemini가 코스 장소를 반환하지 않았습니다."
                 );
             }
 
@@ -1146,11 +1571,7 @@ public class RecommendationService {
                             .order(coursePlaces.size() + 1)
                             .placeId(original.getPlaceId())
                             .name(original.getName())
-                            .summary(
-                                    buildCoursePlaceSummary(
-                                            selected
-                                    )
-                            )
+                            .summary(original.getSummary())
                             .imageUrl(original.getImageUrl())
                             .latitude(original.getLatitude())
                             .longitude(original.getLongitude())
@@ -1158,16 +1579,21 @@ public class RecommendationService {
             );
         }
 
-        if (coursePlaces.size() < 2) {
-            throw new BusinessException(
-                    ErrorCode.EXTERNAL_API_ERROR,
-                    "여행 코스를 구성할 장소가 부족합니다."
-            );
+        // Preserve every selected place even when Gemini omits one; retain generated order first.
+        Set<String> included = coursePlaces.stream().map(CoursePlaceResponse::getPlaceId)
+                .collect(java.util.stream.Collectors.toSet());
+        for (String id : request.getSelectedPlaceIds()) {
+            if (!included.add(id)) continue;
+            var place = candidateMap.get(id);
+            coursePlaces.add(CoursePlaceResponse.builder().order(coursePlaces.size() + 1)
+                    .placeId(id).name(place.getName()).summary(place.getSummary())
+                    .imageUrl(place.getImageUrl()).latitude(place.getLatitude())
+                    .longitude(place.getLongitude()).build());
         }
 
         return CourseResponse.builder()
                 .courseId(
-                        "course-" + System.currentTimeMillis()
+                        "course-" + java.util.UUID.randomUUID()
                 )
                 .courseTitle(
                         buildCourseTitle(
@@ -1179,12 +1605,15 @@ public class RecommendationService {
                         geminiResponse.getTotalDuration()
                 )
                 .tags(
-                        geminiResponse.getTags()
+                        buildCourseTags(
+                                geminiResponse.getTags(),
+                                request
+                        )
                 )
                 .description(
                         geminiResponse.getDescription()
                 )
-                .mapImageUrl(null)
+                .mapImageUrl(mapImages.render(coursePlaces))
                 .places(coursePlaces)
                 .build();
     }
@@ -1245,32 +1674,6 @@ public class RecommendationService {
                     place
             );
         }
-    }
-
-    private String buildCoursePlaceSummary(
-            GeminiCourseResponse.CoursePlace selected
-    ) {
-        String reason =
-                selected.getReason() == null
-                        || selected.getReason().isBlank()
-                        ? "여행 조건에 맞는 추천 장소입니다."
-                        : selected.getReason();
-
-        String category =
-                selected.getCategory() == null
-                        || selected.getCategory().isBlank()
-                        ? ""
-                        : "[" + selected.getCategory() + "] ";
-
-        String time =
-                selected.getRecommendedTime() == null
-                        || selected.getRecommendedTime().isBlank()
-                        ? ""
-                        : " 방문 추천 시간: "
-                        + selected.getRecommendedTime()
-                        + ".";
-
-        return category + reason + time;
     }
 
     private NearbyRecommendationResponse filterSelectedPlaces(
@@ -1388,11 +1791,10 @@ public class RecommendationService {
             NearbyRecommendationResponse nearbyResponse,
             List<String> selectedPlaceIds
     ) {
-        if (selectedPlaceIds == null
-                || selectedPlaceIds.isEmpty()) {
+        if (selectedPlaceIds == null || selectedPlaceIds.size() > 4) {
             throw new BusinessException(
                     ErrorCode.INVALID_INPUT_VALUE,
-                    "선택한 주변 장소가 없습니다."
+                    "주변 장소는 0~4개 선택해야 합니다."
             );
         }
 
@@ -1469,7 +1871,12 @@ public class RecommendationService {
                 .order(1)
                 .placeId(mainPlaceId)
                 .name(mainPlace.getName())
-                .summary("사용자가 선택한 메인 관광지입니다.")
+                .summary(
+                        tourismPlaceMapper.summarize(
+                                mainPlace.getName(),
+                                mainPlace.getDescription()
+                        )
+                )
                 .imageUrl(mainPlace.getImageUrl())
                 .latitude(mainPlace.getLatitude())
                 .longitude(mainPlace.getLongitude())
@@ -1503,6 +1910,34 @@ public class RecommendationService {
                         )
                 )
                 .toList();
+    }
+
+    private List<String> buildCourseTags(
+            List<String> geminiTags,
+            CourseGenerationRequest request
+    ) {
+        List<String> tags = new ArrayList<>();
+
+        if (geminiTags != null && !geminiTags.isEmpty()) {
+            tags.add(geminiTags.get(0));
+        }
+
+        addIfNotBlank(tags, request.getTravelType());
+        addIfNotBlank(tags, request.getCompanion());
+        addIfNotBlank(tags, request.getRegion());
+
+        return tags;
+    }
+
+    private void addIfNotBlank(
+            List<String> tags,
+            String value
+    ) {
+        if (value != null
+                && !value.isBlank()
+                && !tags.contains(value)) {
+            tags.add(value);
+        }
     }
 
     private boolean containsOtherRegion(
@@ -1565,81 +2000,5 @@ public class RecommendationService {
 
         return excludedKeywords.stream()
                 .anyMatch(text::contains);
-    }
-
-    private NearbyRecommendationResponse.NearbyPlace enrichNearbyPlace(
-            TourismApiResponse.Item item
-    ) {
-        NearbyRecommendationResponse.NearbyPlace basicPlace =
-                tourismPlaceMapper.toNearbyPlace(item);
-
-        if (basicPlace == null
-                || item.getContentid() == null
-                || item.getContentid().isBlank()) {
-            return basicPlace;
-        }
-
-        TourismApiResponse detailResponse =
-                tourismApiClient.getPlaceDetail(
-                        item.getContentid()
-                );
-
-        PlaceDetailResponse detail =
-                tourismPlaceMapper.toPlaceDetailResponse(
-                        item.getContentid(),
-                        detailResponse,
-                        null,
-                        null
-                );
-
-        if (detail == null) {
-            return basicPlace;
-        }
-
-        return NearbyRecommendationResponse.NearbyPlace.builder()
-                .placeId(basicPlace.getPlaceId())
-                .name(firstNonBlank(
-                        detail.getName(),
-                        basicPlace.getName()
-                ))
-                .imageUrl(firstNonBlank(
-                        detail.getImageUrl(),
-                        basicPlace.getImageUrl()
-                ))
-                .summary(firstNonBlank(
-                        detail.getDescription(),
-                        basicPlace.getSummary()
-                ))
-                .address(firstNonBlank(
-                        detail.getAddress(),
-                        basicPlace.getAddress()
-                ))
-                .latitude(firstNonNull(
-                        detail.getLatitude(),
-                        basicPlace.getLatitude()
-                ))
-                .longitude(firstNonNull(
-                        detail.getLongitude(),
-                        basicPlace.getLongitude()
-                ))
-                .build();
-    }
-
-    private String firstNonBlank(
-            String first,
-            String second
-    ) {
-        if (first != null && !first.isBlank()) {
-            return first;
-        }
-
-        return second;
-    }
-
-    private Double firstNonNull(
-            Double first,
-            Double second
-    ) {
-        return first != null ? first : second;
     }
 }

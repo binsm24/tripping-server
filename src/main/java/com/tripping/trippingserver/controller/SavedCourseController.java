@@ -13,12 +13,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/saved-courses")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 @Tag(
         name = "Saved Course",
         description = "저장된 여행 코스 및 보관함 API"

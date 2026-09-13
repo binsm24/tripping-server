@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -28,6 +29,12 @@ public class SavedCourseSummaryResponse {
             example = "강릉 감성 힐링 여행"
     )
     private String courseTitle;
+
+    @Schema(
+            description = "여행 코스 태그 목록",
+            example = "[\"힐링\", \"자연\", \"친구\", \"수원\"]"
+    )
+    private List<String> tags;
 
     @Schema(
             description = "예상 소요 시간",

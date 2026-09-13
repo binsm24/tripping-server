@@ -10,6 +10,7 @@ import com.google.cloud.firestore.WriteResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,7 @@ public class SavedCourseRepository {
         data.put("description", document.getDescription());
         data.put("mapImageUrl", document.getMapImageUrl());
         data.put("createdAt", document.getCreatedAt());
+        data.put("expiresAt", document.getExpiresAt());
         data.put("places", toPlaceMaps(document.getPlaces()));
 
 
@@ -65,6 +67,7 @@ public class SavedCourseRepository {
                 .description(document.getDescription())
                 .mapImageUrl(document.getMapImageUrl())
                 .createdAt(document.getCreatedAt())
+                .expiresAt(document.getExpiresAt())
                 .places(document.getPlaces())
                 .build();
     }
@@ -161,6 +164,7 @@ public class SavedCourseRepository {
                 .description(document.getString("description"))
                 .mapImageUrl(document.getString("mapImageUrl"))
                 .createdAt(document.getString("createdAt"))
+                .expiresAt(document.getString("expiresAt"))
                 .places(places)
                 .build();
     }
@@ -205,5 +209,37 @@ public class SavedCourseRepository {
                     return data;
                 })
                 .toList();
+    }
+
+    public List<SavedCourseDocument> findExpiredCourses(
+            LocalDateTime now
+    ) throws ExecutionException, InterruptedException {
+        QuerySnapshot querySnapshot =
+                collection()
+                        .whereLessThanOrEqualTo(
+                                "expiresAt",
+                                now.toString()
+                        )
+                        .get()
+                        .get();
+
+        List<SavedCourseDocument> result =
+                new ArrayList<>();
+
+        for (DocumentSnapshot document :
+                querySnapshot.getDocuments()) {
+            result.add(toDocument(document));
+        }
+
+        return result;
+    }
+
+    public void delete(
+            String savedCourseId
+    ) throws ExecutionException, InterruptedException {
+        collection()
+                .document(savedCourseId)
+                .delete()
+                .get();
     }
 }

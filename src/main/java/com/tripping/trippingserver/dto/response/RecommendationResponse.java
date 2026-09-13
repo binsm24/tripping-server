@@ -25,7 +25,7 @@ public class RecommendationResponse {
 
     @Schema(
             description = "추천 세션 ID",
-            example = "test-session-001"
+            example = "3599d2b9-071b-4ab6-ae03-ae8d0e9c8e62"
     )
     private String recommendationSessionId;
 
